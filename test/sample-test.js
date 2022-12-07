@@ -1,28 +1,9 @@
 const { expect } = require("chai");
-const { solidityPack, keccak256 } = require("ethers/lib/utils");
 const { ethers } = require("hardhat");
-const MerkleTree = require("merkletreejs");
+const { generateMerkleTree } = require("../utils/utils");
 
 describe("DaoConfigurator", function () {
     let DaoConfigurator, contractInstance, owner, addr1, addr2, addr3, addrs;
-
-    const generateMerkleTree = (tokenIds) => {
-        const len = tokenIds.length;
-        const last_elem = tokenIds[len - 1];
-        let n = Math.pow(2, Math.ceil(Math.log(len) / Math.log(2)));
-        n = Math.max(n, 2);
-
-        for (let i = 0; i < n - len; i++) {
-            tokenIds.push(last_elem);
-        }
-
-        const leaves = tokenIds.map((x) =>
-            keccak256(solidityPack(["uint256"], [x]))
-        );
-        const tree = new MerkleTree(leaves, keccak256, { sort: true });
-
-        return tree.getHexRoot();
-    };
 
     beforeEach(async function () {
         DaoConfigurator = await ethers.getContractFactory(
@@ -57,7 +38,7 @@ describe("DaoConfigurator", function () {
     });
 
     describe("Deployment", function () {
-        console.log(owner, "owner");
+        console.log(owner, addr1, addr2, addr3, addrs, "owner");
         // it("Should set the right owner", async function () {
         //     expect(await contractInstance.owner()).to.equal(owner.address);
         // });
