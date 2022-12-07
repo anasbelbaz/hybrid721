@@ -1,6 +1,23 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { generateMerkleTree } = require("../utils/utils");
+const { solidityPack, keccak256 } = require("ethers/lib/utils");
+const MerkleTree = require("merkletreejs");
+
+const generateMerkleTree = (array) => {
+    const len = array.length;
+    const last_elem = array[len - 1];
+    let n = Math.pow(2, Math.ceil(Math.log(len) / Math.log(2)));
+    n = Math.max(n, 2);
+
+    for (let i = 0; i < n - len; i++) {
+        array.push(last_elem);
+    }
+
+    const leaves = array.map((x) => keccak256(solidityPack(["uint256"], [x])));
+    const tree = new MerkleTree(leaves, keccak256, { sort: true });
+
+    return tree.getHexRoot();
+};
 
 describe("DaoConfigurator", function () {
     let DaoConfigurator, contractInstance, owner, addr1, addr2, addr3, addrs;
@@ -25,126 +42,58 @@ describe("DaoConfigurator", function () {
             1670436600,
             10
         );
+        const admins = [addr2, addr3];
+        contractInstance.setAdmins(admins);
+        // const whiteList = [addr1, addr2, addr3];
 
-        const whiteList = [addr1, addr2, addr3];
-
-        contractInstance.setWhiteListe(
-            1670429163,
-            10,
-            1,
-            generateMerkleTree(whiteList),
-            true
-        );
+        // contractInstance.setWhiteListe(
+        //     1670429163,
+        //     10,
+        //     1,
+        //     generateMerkleTree(whiteList),
+        //     true
+        // );
     });
 
-    describe("Deployment", function () {
-        console.log(owner, addr1, addr2, addr3, addrs, "owner");
-        // it("Should set the right owner", async function () {
-        //     expect(await contractInstance.owner()).to.equal(owner.address);
-        // });
+    describe("check owner", function () {
+        it("Should set the right owner", async function () {
+            expect(await contractInstance.owner()).to.equal(owner.address);
+        });
     });
 
-    // describe("setIsAllowListActive", function () {
-    //     it("Should be reverted because the caller is not owner", async function () {
-    //         await expect(
-    //             contractInstance.connect(addr1).setIsAllowListActive(true)
-    //         ).to.be.revertedWith("Ownable: caller is not the owner");
-    //     });
+    describe("set only owner function", function () {
+        it("Should be reverted because the caller is not owner", async function () {
+            await expect(
+                contractInstance.connect(addr1).toggleMint()
+            ).to.be.revertedWith("Ownable: caller is not the owner");
+        });
 
-    //     it("Should should set isAllowListActive by owner", async function () {
-    //         const expectedValue = true;
+        it("Should Admin mint", async function () {
+            await contractInstance.connect(owner).AdminMint(2, addr1.address);
+            expect(await contractInstance.ownerOf(1)).to.equal(addr1.address);
+        });
 
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setIsAllowListActive(expectedValue);
+        it("Should should set toggleMint by owner", async function () {
+            await contractInstance.connect(owner).toggleMint();
 
-    //         expect(await contractInstance.isAllowListActive()).to.equal(
-    //             expectedValue
-    //         );
-    //     });
-    // });
+            expect(await contractInstance.OPEN_SALES()).to.equal(false);
+        });
+    });
 
-    // describe("setAllowList", function () {
-    //     it("Should be reverted because the caller is not owner", async function () {
-    //         await expect(
-    //             contractInstance
-    //                 .connect(addr1)
-    //                 .setAllowList([addr1.address], 10)
-    //         ).to.be.revertedWith("caller is not the owner");
-    //     });
+    describe("setBaseURI", function () {
+        it("Should be reverted because the caller is not owner", async function () {
+            await expect(
+                contractInstance.connect(addr1).setBaseUri("url")
+            ).to.be.revertedWith("caller is not the owner");
+        });
 
-    //     // THIS IS NOT WORKING, BECAUSE _allowList is private
-    //     // it('Should should set _allowList by owner', async function () {
-    //     //   const expectedValue = 10
+        it("Should set the baseTokenURI by owner", async function () {
+            const baseurl = "ipfs://test.url/";
+            await contractInstance.connect(owner).setBaseUri(baseurl);
 
-    //     //   await contractInstance
-    //     //     .connect(owner)
-    //     //     .setAllowList([addr1.address, addr2.address], expectedValue)
-
-    //     //   expect(
-    //     //     await contractInstance.connect(owner)._allowList(addr1.address),
-    //     //   ).to.equal(expectedValue)
-    //     //   expect(
-    //     //     await contractInstance.connect(owner)._allowList(addr2.address),
-    //     //   ).to.equal(expectedValue)
-    //     // })
-
-    //     it("Should should set _allowList by owner", async function () {
-    //         const expectedValue = 10;
-
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setAllowList([addr1.address, addr2.address], expectedValue);
-
-    //         expect(
-    //             await contractInstance.numAvailableToMint(addr1.address)
-    //         ).to.equal(expectedValue);
-    //         expect(
-    //             await contractInstance.numAvailableToMint(addr2.address)
-    //         ).to.equal(expectedValue);
-    //     });
-
-    //     it("Should should set _allowList by owner", async function () {
-    //         await contractInstance.connect(owner).setIsAllowListActive(true);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.123"), // ether in this case MUST be a string
-    //         };
-    //         await expect(
-    //             contractInstance.connect(addr1).mintAllowList(1, overrides)
-    //         ).to.be.revertedWith("Exceeded max available to purchase");
-
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setAllowList([addr1.address], 1);
-    //         await contractInstance.connect(addr1).mintAllowList(1, overrides);
-
-    //         //assert
-    //         expect(await contractInstance.ownerOf(0)).to.equal(addr1.address);
-    //         await expect(contractInstance.ownerOf(1)).to.be.revertedWith(
-    //             "URI query for nonexistent token"
-    //         );
-    //     });
-    // });
-
-    // describe("numAvailableToMint", function () {
-    //     it("Should show numAvailableToMint", async function () {
-    //         const expectedValue = 5;
-
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setAllowList([addr1.address, addr2.address], expectedValue);
-
-    //         expect(
-    //             await contractInstance.numAvailableToMint(addr1.address)
-    //         ).to.equal(expectedValue);
-    //         expect(
-    //             await contractInstance.numAvailableToMint(addr2.address)
-    //         ).to.equal(expectedValue);
-    //         expect(
-    //             await contractInstance.numAvailableToMint(addr3.address)
-    //         ).to.equal(0);
-    //     });
-    // });
+            expect(await contractInstance.BASE_URI()).to.equal(baseurl);
+        });
+    });
 
     // describe("mintAllowList", function () {
     //     it("Should be reverted because the isAllowListActive is false", async function () {
@@ -222,27 +171,6 @@ describe("DaoConfigurator", function () {
     //         await contractInstance.connect(addr1).mintAllowList(1, overrides);
 
     //         expect(await contractInstance.tokenURI(0)).to.equal(baseurl + "0"); //ipfs://test.url/0
-    //         expect(await contractInstance.ownerOf(0)).to.equal(addr1.address);
-    //     });
-    // });
-
-    // describe("setBaseURI", function () {
-    //     it("Should be reverted because the caller is not owner", async function () {
-    //         await expect(
-    //             contractInstance.connect(addr1).setBaseURI("url")
-    //         ).to.be.revertedWith("caller is not the owner");
-    //     });
-
-    //     it("Should set the baseTokenURI by owner", async function () {
-    //         const baseurl = "ipfs://test.url/";
-    //         contractInstance.connect(owner).setBaseURI(baseurl);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.123"), // ether in this case MUST be a string
-    //         };
-    //         await contractInstance.connect(owner).setSaleState(true);
-    //         await contractInstance.connect(addr1).mint(1, overrides);
-
-    //         expect(await contractInstance.tokenURI(0)).to.equal(baseurl + "0");
     //         expect(await contractInstance.ownerOf(0)).to.equal(addr1.address);
     //     });
     // });
