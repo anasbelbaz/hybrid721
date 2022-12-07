@@ -39,12 +39,6 @@ module.exports = {
             url: "http://127.0.0.1:8545",
             chainId: 1337,
         },
-        hardhat: {
-            accounts: {
-                gasPrice: 225000000000,
-                chainId: 43112,
-            },
-        },
         test: {
             url: process.env.TEST_URL,
             accounts: [process.env.PRIVATE_KEY],
