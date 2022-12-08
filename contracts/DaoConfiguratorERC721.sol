@@ -10,10 +10,11 @@ import "./lib/ERC2981PerTokenRoyalties.sol";
 import "./RandomRequest.sol";
 
 struct WhiteList {
-    bytes32 MERKLE_ROOT;
-    uint256 MAX_WL_CLAIM;
     uint256 WL_START_DATE;
+    uint256 WL_END_DATE;
+    uint256 MAX_WL_CLAIM;
     uint256 WL_PRICE;
+    bytes32 MERKLE_ROOT;
 }
 
 contract DaoConfiguratorERC721 is
@@ -44,11 +45,6 @@ contract DaoConfiguratorERC721 is
     uint256 public MAX_PUBLIC_CLAIM; // max mint per address for the public / if 0, their is no limit
     uint256 public PUBLIC_START_DATE;
     uint256 public PUBLIC_PRICE; // price for public
-
-    uint256 public MAX_WL_CLAIM; // max mint per address for the WL / if 0, their is no limit
-    uint256 public WL_START_DATE;
-    uint256 public WL_PRICE; // price for WL
-    bytes32 public MERKLE_ROOT;
 
     mapping(address => uint256) public whiteListMintAddresses;
     mapping(address => uint256) public publicMintedAmount;
@@ -99,16 +95,16 @@ contract DaoConfiguratorERC721 is
         // check if mint event is open or closed
         require(OPEN_SALES, "It's not possible to claim just yet");
 
-        // check WL mint date
+        // check WL start date
         require(
             block.timestamp >= whitelists[position].WL_START_DATE,
             "Not started yet"
         );
 
-        // check public mint date
+        // check WL end date
         require(
-            block.timestamp < PUBLIC_START_DATE,
-            "Public mint is open, the whitelist mint is over"
+            block.timestamp < whitelists[position].WL_END_DATE,
+            "Whitelist sales has ended"
         );
 
         // cannot mint 0 erc721
@@ -367,24 +363,12 @@ contract DaoConfiguratorERC721 is
     //
     //
 
-    function setWLPrice(uint256 _price) external onlyOwner {
-        WL_PRICE = _price;
-    }
-
     function setPublicPrice(uint256 _price) external onlyOwner {
         PUBLIC_PRICE = _price;
     }
 
-    function setMerkleRoot(bytes32 _root) external onlyOwner {
-        MERKLE_ROOT = _root;
-    }
-
     function setPublicStartDate(uint256 _START_DATE) external onlyOwner {
         PUBLIC_START_DATE = _START_DATE;
-    }
-
-    function setWLstartDate(uint256 _WL_START_DATE) external onlyOwner {
-        WL_START_DATE = _WL_START_DATE;
     }
 
     function setRevealDate(uint256 _REVEAL_DATE) external onlyOwner {
@@ -423,16 +407,18 @@ contract DaoConfiguratorERC721 is
 
     function updateWhiteList(
         uint256 _WL_START_DATE,
+        uint256 _WL_END_DATE,
         uint256 _MAX_WL_CLAIM,
         uint256 _WL_PRICE,
         bytes32 _MERKLE_ROOT,
         uint256 position
     ) external onlyOwner {
         WhiteList memory whitelist = WhiteList(
-            _MERKLE_ROOT,
             _WL_START_DATE,
+            _WL_END_DATE,
             _MAX_WL_CLAIM,
-            _WL_PRICE
+            _WL_PRICE,
+            _MERKLE_ROOT
         );
 
         whitelists[position] = whitelist;
@@ -440,22 +426,23 @@ contract DaoConfiguratorERC721 is
 
     function addWhiteList(
         uint256 _WL_START_DATE,
+        uint256 _WL_END_DATE,
         uint256 _MAX_WL_CLAIM,
         uint256 _WL_PRICE,
-        bytes32 _MERKLE_ROOT,
-        bool _HAS_WL
+        bytes32 _MERKLE_ROOT
     ) external onlyOwner {
         WhiteList memory whitelist = WhiteList(
-            _MERKLE_ROOT,
             _WL_START_DATE,
+            _WL_END_DATE,
             _MAX_WL_CLAIM,
-            _WL_PRICE
+            _WL_PRICE,
+            _MERKLE_ROOT
         );
 
         whitelists.push(whitelist);
 
-        if (!_HAS_WL) {
-            _HAS_WL = true;
+        if (!HAS_WL) {
+            HAS_WL = true;
         }
     }
 
@@ -469,10 +456,12 @@ contract DaoConfiguratorERC721 is
 
     function isWhiteListed(
         address _whitelistedAddress,
-        bytes32[] calldata _proof
+        bytes32[] calldata _proof,
+        uint256 position
     ) public view returns (bool) {
         bytes32 leaf = keccak256(abi.encodePacked(_whitelistedAddress));
-        return MerkleProof.verify(_proof, MERKLE_ROOT, leaf);
+        return
+            MerkleProof.verify(_proof, whitelists[position].MERKLE_ROOT, leaf);
     }
 
     function whiteListMintedCount(address _whitelistedAddress)
