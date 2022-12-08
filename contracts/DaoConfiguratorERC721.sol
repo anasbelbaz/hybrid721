@@ -216,7 +216,7 @@ contract DaoConfiguratorERC721 is
             emit MINT(randomID);
         }
 
-        // mark that the tokens has been randomized in order to call adminMintRandom
+        // mark that the tokens have been randomized in order to call adminMintRandom
         if (!RANDOMIZED) {
             RANDOMIZED = true;
         }
@@ -304,7 +304,7 @@ contract DaoConfiguratorERC721 is
             emit MINT(randomID);
         }
 
-        // mark that the tokens has been randomized in order to call adminMintRandom
+        // mark that the tokens have been randomized in order to call adminMintRandom
         if (!RANDOMIZED) {
             RANDOMIZED = true;
         }

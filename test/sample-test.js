@@ -16,6 +16,7 @@ describe("DaoConfigurator", function () {
         addr1,
         addr2,
         addr3,
+        addr4,
         addrs,
         merkleTree0,
         merkleTree1;
@@ -25,7 +26,8 @@ describe("DaoConfigurator", function () {
             "DaoConfiguratorERC721"
         );
 
-        [owner, addr1, addr2, addr3, ...addrs] = await ethers.getSigners();
+        [owner, addr1, addr2, addr3, addr4, ...addrs] =
+            await ethers.getSigners();
 
         contractInstance = await DaoConfigurator.deploy(
             "NFT_NAME",
@@ -43,7 +45,7 @@ describe("DaoConfigurator", function () {
         const admins = [addr2.address, addr3.address];
         contractInstance.setAdmins(admins);
 
-        const whiteList0 = [addr1.address, addr2.address];
+        const whiteList0 = [addr1.address, addr2.address, addr4.address];
 
         const leaves = whiteList0.map((x) =>
             keccak256(solidityPack(["address"], [x]))
@@ -59,7 +61,7 @@ describe("DaoConfigurator", function () {
             merkleTree0.getHexRoot()
         );
 
-        const whiteList1 = [addr3.address];
+        const whiteList1 = [addr3.address, addr4.address];
 
         const leaves1 = whiteList1.map((x) =>
             keccak256(solidityPack(["address"], [x]))
@@ -278,6 +280,42 @@ describe("DaoConfigurator", function () {
                 .connect(addr3)
                 .whiteListMint(1, hexProof1, 1, overrides);
             expect(await contractInstance.balanceOf(addr3.address)).to.equal(1);
+        });
+
+        it("Same user should be able to mint from two whitelists", async function () {
+            const claimingAddress0 = keccak256(addr4.address);
+            const hexProof0 = merkleTree0.getHexProof(claimingAddress0);
+            const hexProof1 = merkleTree1.getHexProof(claimingAddress0);
+
+            const overrides = {
+                value: ethers.utils.parseEther("10"),
+            };
+
+            await contractInstance
+                .connect(addr4)
+                .whiteListMint(10, hexProof0, 0, overrides);
+            expect(await contractInstance.balanceOf(addr4.address)).to.equal(
+                10
+            );
+
+            await contractInstance
+                .connect(addr4)
+                .whiteListMint(10, hexProof1, 1, overrides);
+            expect(await contractInstance.balanceOf(addr4.address)).to.equal(
+                20
+            );
+
+            await expect(
+                contractInstance
+                    .connect(addr4)
+                    .whiteListMint(1, hexProof0, 0, overrides)
+            ).to.be.revertedWith("you can't claim that much");
+
+            await expect(
+                contractInstance
+                    .connect(addr4)
+                    .whiteListMint(1, hexProof1, 1, overrides)
+            ).to.be.revertedWith("you can't claim that much");
         });
 
         it("Should be reverted if exceeded max token purchase", async function () {
