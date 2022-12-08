@@ -3,8 +3,8 @@ pragma solidity 0.8.1;
 
 contract RandomRequest {
     uint256 private _scopeIndex = 0; // cache for random TokenID generation in the anti-sniping algo
-    uint256 private immutable _scopeCap; //Size of initial randomized number pool & max generated value (zero indexed)
-    mapping(uint256 => uint256) _swappedIDs; //TokenID cache for random TokenID generation in the anti-sniping algo
+    uint256 private immutable _scopeCap; //size of initial randomized number pool & max generated value (zero indexed)
+    mapping(uint256 => uint256) _swappedIDs; //tokenID cache for random TokenID generation in the anti-sniping algo
 
     constructor(uint256 scopeCap) {
         _scopeCap = scopeCap;
