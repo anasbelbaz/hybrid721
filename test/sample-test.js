@@ -337,7 +337,7 @@ describe("DaoConfigurator", function () {
                 .whiteListMint(10, hexProof, 0, overrides);
 
             expect(
-                await contractInstance.whiteListMintedCount(addr1.address)
+                await contractInstance.whiteListMintedCount(addr1.address, 0)
             ).to.equal(10);
         });
 

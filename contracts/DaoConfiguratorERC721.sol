@@ -15,7 +15,6 @@ struct WhiteList {
     uint256 MAX_WL_CLAIM;
     uint256 WL_PRICE;
     bytes32 MERKLE_ROOT;
-    mapping(address => uint256) whiteListMintAddresses;
 }
 
 contract DaoConfiguratorERC721 is
@@ -49,6 +48,9 @@ contract DaoConfiguratorERC721 is
 
     mapping(address => uint256) public publicMintedAmount;
     mapping(address => bool) private admins;
+
+    mapping(uint256 => mapping(address => uint256))
+        public whiteListMintAddresses;
 
     event WL_MINT(uint256 indexed _id);
     event MINT(uint256 indexed _id);
@@ -130,18 +132,18 @@ contract DaoConfiguratorERC721 is
         // if MAX_WL_CLAIM > 0, we check if the sender has exceeded mint limit
         if (whitelists[position].MAX_WL_CLAIM > 0) {
             require(
-                whitelists[position].whiteListMintAddresses[msg.sender] <=
+                whiteListMintAddresses[position][msg.sender] <=
                     whitelists[position].MAX_WL_CLAIM,
                 "You can't claim anymore"
             );
             require(
-                n + whitelists[position].whiteListMintAddresses[msg.sender] <=
+                n + whiteListMintAddresses[position][msg.sender] <=
                     whitelists[position].MAX_WL_CLAIM,
                 "you can't claim that much"
             );
 
             // After the checks, we increments sender mint count
-            whitelists[position].whiteListMintAddresses[msg.sender] += n;
+            whiteListMintAddresses[position][msg.sender] += n;
         }
 
         //  check if the tokens sent exceeds the price, in order to return the rest
@@ -438,7 +440,7 @@ contract DaoConfiguratorERC721 is
             _MERKLE_ROOT
         );
 
-        whitelists.push();
+        whitelists.push(whitelist);
 
         if (!HAS_WL) {
             HAS_WL = true;
@@ -468,7 +470,7 @@ contract DaoConfiguratorERC721 is
         view
         returns (uint256)
     {
-        uint256 userMinted = whitelists[position].whiteListMintAddresses[
+        uint256 userMinted = whiteListMintAddresses[position][
             _whitelistedAddress
         ];
         return userMinted;
