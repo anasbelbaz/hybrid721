@@ -1,4 +1,5 @@
 const { ethers } = require("hardhat");
+const { args } = require("./arguments");
 
 async function main() {
     const [deployer] = await ethers.getSigners();
@@ -10,18 +11,32 @@ async function main() {
         "DaoConfiguratorERC721"
     );
 
+    const [
+        _name,
+        _symbol,
+        _baseTokenURI,
+        _revealURI,
+        _MAX_MINTABLE,
+        _ROYALTY_RECIPIENT,
+        _ROYALTY_VALUE,
+        _START_DATE,
+        _NFT_PUBLIC_PRICE,
+        _REVEAL_DATE,
+        _MAX_PUBLIC_CLAIM,
+    ] = args;
+
     const contractInstance = await DaoConfiguratorERC721.deploy(
-        "NFT_NAME", // _name
-        "NFT_SYMBOL", // _symbol
-        "base ", // baseTokenURI
-        "reveal ", // revealURI
-        10000, // total supply
-        "0xab7b1563C4cA2A002b3F8bFf9dC1499CEdF8e4F3", // royalty recipient
-        500, //_ROYALTY_VALUE
-        1670429163, // public start date https://www.unixtimestamp.com/
-        1, // public price
-        1670436600, // _REVEAL_DATE  https://www.unixtimestamp.com/
-        10 //public max claim per mint
+        _name,
+        _symbol,
+        _baseTokenURI,
+        _revealURI,
+        _MAX_MINTABLE,
+        _ROYALTY_RECIPIENT,
+        _ROYALTY_VALUE,
+        _START_DATE,
+        _NFT_PUBLIC_PRICE,
+        _REVEAL_DATE,
+        _MAX_PUBLIC_CLAIM
     );
 
     await contractInstance.deployed();

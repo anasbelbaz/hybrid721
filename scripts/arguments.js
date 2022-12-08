@@ -1,4 +1,4 @@
-module.exports = [
+const args = [
     "NFT_NAME",
     "NFT_SYMBOL",
     "base ",
@@ -11,3 +11,5 @@ module.exports = [
     1670436600,
     10,
 ];
+
+module.exports = args;
