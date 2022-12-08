@@ -65,16 +65,53 @@ describe("DaoConfigurator", function () {
         });
     });
 
-    describe("onlyOwner function", function () {
+    describe("check setBaseURI", function () {
+        it("Should be reverted because the caller is not owner", async function () {
+            await expect(
+                contractInstance.connect(addr1).setBaseUri("url")
+            ).to.be.revertedWith("caller is not the owner");
+        });
+
+        it("Should set the baseTokenURI by owner", async function () {
+            const baseurl = "ipfs://test.url/";
+            await contractInstance.connect(owner).setBaseUri(baseurl);
+
+            expect(await contractInstance.BASE_URI()).to.equal(baseurl);
+        });
+    });
+
+    describe("check admin mint", function () {
+        it("Should not Admin mint", async function () {
+            await expect(
+                contractInstance.connect(addr1).adminMint(2, addr1.address)
+            ).to.be.revertedWith("Ownable: caller is not the owner");
+        });
+
+        it("Should Random Admin mint", async function () {
+            await contractInstance
+                .connect(owner)
+                .adminRandomMint(2, addr1.address);
+            expect(await contractInstance.balanceOf(addr1.address)).to.equal(2);
+        });
+
+        it("Should not Admin mint in order", async function () {
+            await contractInstance
+                .connect(owner)
+                .adminRandomMint(2, addr1.address);
+
+            await expect(
+                contractInstance.connect(owner).adminMint(2, addr1.address)
+            ).to.be.revertedWith(
+                "can't mint in order, tokens have already been randomized"
+            );
+        });
+    });
+
+    describe("check onlyOwner functions", function () {
         it("Should be reverted because the caller is not owner", async function () {
             await expect(
                 contractInstance.connect(addr1).toggleMint()
             ).to.be.revertedWith("Ownable: caller is not the owner");
-        });
-
-        it("Should Admin mint", async function () {
-            await contractInstance.connect(owner).adminMint(2, addr1.address);
-            expect(await contractInstance.ownerOf(1)).to.equal(addr1.address);
         });
 
         it("Should should set toggleMint by owner", async function () {
@@ -84,7 +121,7 @@ describe("DaoConfigurator", function () {
         });
     });
 
-    describe("whitelist", function () {
+    describe("check whitelisted user", function () {
         it("Should not be whitelisted", async function () {
             const claimingAddress = keccak256(owner.address);
             const hexProof = merkleTree.getHexProof(claimingAddress);
@@ -107,7 +144,7 @@ describe("DaoConfigurator", function () {
         });
     });
 
-    describe("WhitelistMint", function () {
+    describe("whitelist mint", function () {
         it("Should be reverted because the HAS_WL is false", async function () {
             const claimingAddress = keccak256(addr1.address);
             const hexProof = merkleTree.getHexProof(claimingAddress);
@@ -218,6 +255,23 @@ describe("DaoConfigurator", function () {
             ).to.be.revertedWith("you can't claim that much");
         });
 
+        it("Verify whitelisted user minting count", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree.getHexProof(claimingAddress);
+            await contractInstance.setPublicStartDate(addDays(new Date(), 2));
+            const overrides = {
+                value: ethers.utils.parseEther("10"),
+            };
+
+            await contractInstance
+                .connect(addr1)
+                .whiteListMint(10, hexProof, overrides);
+
+            expect(
+                await contractInstance.whiteListMintedCount(addr1.address)
+            ).to.equal(10);
+        });
+
         it("Should mint token", async function () {
             const claimingAddress = keccak256(addr1.address);
             const hexProof = merkleTree.getHexProof(claimingAddress);
@@ -233,22 +287,7 @@ describe("DaoConfigurator", function () {
         });
     });
 
-    describe("setBaseURI", function () {
-        it("Should be reverted because the caller is not owner", async function () {
-            await expect(
-                contractInstance.connect(addr1).setBaseUri("url")
-            ).to.be.revertedWith("caller is not the owner");
-        });
-
-        it("Should set the baseTokenURI by owner", async function () {
-            const baseurl = "ipfs://test.url/";
-            await contractInstance.connect(owner).setBaseUri(baseurl);
-
-            expect(await contractInstance.BASE_URI()).to.equal(baseurl);
-        });
-    });
-
-    describe("mint", function () {
+    describe("public mint", function () {
         it("Should be reverted because the OPEN_SALES is false", async function () {
             await contractInstance.connect(owner).toggleMint();
             const overrides = {
