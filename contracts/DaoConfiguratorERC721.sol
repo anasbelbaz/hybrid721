@@ -167,7 +167,7 @@ contract DaoConfiguratorERC721 is
         require(block.timestamp >= PUBLIC_START_DATE, "Not started yet");
         require(n > 0, "Number need to be higher than 0");
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
-        require(n <= MAX_PER_CLAIM, "you can't claim that much at ounce");
+        require(n <= MAX_PER_CLAIM, "you can't claim that much at once");
         require(
             msg.value >= (PUBLIC_NFT_PRICE * n),
             "Ether value sent is below the price"

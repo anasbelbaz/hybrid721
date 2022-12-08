@@ -1,26 +1,23 @@
-const { expect } = require("chai");
+const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
 const { solidityPack, keccak256 } = require("ethers/lib/utils");
-const MerkleTree = require("merkletreejs");
+const { MerkleTree } = require("merkletreejs");
 
-const generateMerkleTree = (array) => {
-    const len = array.length;
-    const last_elem = array[len - 1];
-    let n = Math.pow(2, Math.ceil(Math.log(len) / Math.log(2)));
-    n = Math.max(n, 2);
-
-    for (let i = 0; i < n - len; i++) {
-        array.push(last_elem);
-    }
-
-    const leaves = array.map((x) => keccak256(solidityPack(["uint256"], [x])));
-    const tree = new MerkleTree(leaves, keccak256, { sort: true });
-
-    return tree.getHexRoot();
+const addDays = (date, days) => {
+    var result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result.getTime();
 };
 
 describe("DaoConfigurator", function () {
-    let DaoConfigurator, contractInstance, owner, addr1, addr2, addr3, addrs;
+    let DaoConfigurator,
+        contractInstance,
+        owner,
+        addr1,
+        addr2,
+        addr3,
+        addrs,
+        merkleTree;
 
     beforeEach(async function () {
         DaoConfigurator = await ethers.getContractFactory(
@@ -34,25 +31,32 @@ describe("DaoConfigurator", function () {
             "NFT_SYMBOL",
             "base ",
             "reveal ",
-            10000,
+            1000,
             "0xab7b1563C4cA2A002b3F8bFf9dC1499CEdF8e4F3",
             500,
             1670429163,
-            1,
+            ethers.utils.parseEther("1"),
             1670436600,
-            10
+            0
         );
         const admins = [addr2, addr3];
         contractInstance.setAdmins(admins);
-        // const whiteList = [addr1, addr2, addr3];
 
-        // contractInstance.setWhiteListe(
-        //     1670429163,
-        //     10,
-        //     1,
-        //     generateMerkleTree(whiteList),
-        //     true
-        // );
+        const whiteList = [addr1.address, addr2.address, addr3.address];
+
+        const leaves = whiteList.map((x) =>
+            keccak256(solidityPack(["address"], [x]))
+        );
+
+        merkleTree = new MerkleTree(leaves, keccak256, { sort: true });
+
+        contractInstance.setWhiteList(
+            1670429163,
+            10,
+            ethers.utils.parseEther("1"),
+            merkleTree.getHexRoot(),
+            true
+        );
     });
 
     describe("check owner", function () {
@@ -61,7 +65,7 @@ describe("DaoConfigurator", function () {
         });
     });
 
-    describe("set only owner function", function () {
+    describe("onlyOwner function", function () {
         it("Should be reverted because the caller is not owner", async function () {
             await expect(
                 contractInstance.connect(addr1).toggleMint()
@@ -69,7 +73,7 @@ describe("DaoConfigurator", function () {
         });
 
         it("Should Admin mint", async function () {
-            await contractInstance.connect(owner).AdminMint(2, addr1.address);
+            await contractInstance.connect(owner).adminMint(2, addr1.address);
             expect(await contractInstance.ownerOf(1)).to.equal(addr1.address);
         });
 
@@ -77,6 +81,29 @@ describe("DaoConfigurator", function () {
             await contractInstance.connect(owner).toggleMint();
 
             expect(await contractInstance.OPEN_SALES()).to.equal(false);
+        });
+    });
+
+    describe("whitelist", function () {
+        it("Should not be whitelisted", async function () {
+            const claimingAddress = keccak256(owner.address);
+            const hexProof = merkleTree.getHexProof(claimingAddress);
+            const proof = await contractInstance
+                .connect(owner)
+                .isWhiteListed(owner.address, hexProof);
+
+            expect(proof).to.equal(false);
+        });
+
+        it("Should be whitelisted", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree.getHexProof(claimingAddress);
+
+            const proof = await contractInstance
+                .connect(addr1)
+                .isWhiteListed(addr1.address, hexProof);
+
+            expect(proof).to.equal(true);
         });
     });
 
@@ -95,201 +122,71 @@ describe("DaoConfigurator", function () {
         });
     });
 
-    // describe("mintAllowList", function () {
-    //     it("Should be reverted because the isAllowListActive is false", async function () {
-    //         await contractInstance.connect(owner).setIsAllowListActive(false);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.123"), // ether in this case MUST be a string
-    //         };
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setAllowList([addr1.address], 1);
-    //         await expect(
-    //             contractInstance.connect(addr1).mintAllowList(1, overrides)
-    //         ).to.be.revertedWith("Allow list is not active");
-    //     });
+    describe("mint", function () {
+        it("Should be reverted because the OPEN_SALES is false", async function () {
+            await contractInstance.connect(owner).toggleMint();
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance.connect(addr1).publicMint(1, overrides)
+            ).to.be.revertedWith("It's not possible to claim just yet");
+        });
 
-    //     it("Should be reverted if exceeded max available to purchase", async function () {
-    //         await contractInstance.connect(owner).setIsAllowListActive(true);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.246"), // ether in this case MUST be a string
-    //         };
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setAllowList([addr1.address], 1);
-    //         await expect(
-    //             contractInstance.connect(addr1).mintAllowList(2, overrides)
-    //         ).to.be.revertedWith("Exceeded max available to purchase");
-    //     });
+        it("Should be reverted if exceeded max token purchase", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("11"),
+            };
 
-    //     it("Should be reverted because the caller exceeds max token", async function () {
-    //         await contractInstance.connect(owner).setIsAllowListActive(true);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("24.6"), // ether in this case MUST be a string
-    //         };
-    //         //50*200 = 10000
-    //         for (let i = 0; i < 50; i++) {
-    //             await contractInstance
-    //                 .connect(owner)
-    //                 .setAllowList([addrs[i].address], 200);
-    //             await contractInstance
-    //                 .connect(addrs[i])
-    //                 .mintAllowList(200, overrides);
-    //         }
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setAllowList([addrs[50].address], 200);
-    //         await expect(
-    //             contractInstance.connect(addrs[50]).mintAllowList(1, overrides)
-    //         ).to.be.revertedWith("Purchase would exceed max tokens");
-    //     });
+            await expect(
+                contractInstance.connect(addr1).publicMint(11, overrides)
+            ).to.be.revertedWith("you can't claim that much at once");
+        });
 
-    //     it("Should be reverted because the caller do not have enough fund", async function () {
-    //         await contractInstance.connect(owner).setIsAllowListActive(true);
+        it("Should be reverted because the caller do not have enough fund", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("0.01"),
+            };
+            await expect(
+                contractInstance.connect(addr1).publicMint(1, overrides)
+            ).to.be.revertedWith("Ether value sent is below the price");
+        });
 
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.122"), // ether in this case MUST be a string
-    //         };
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setAllowList([addr1.address], 1);
-    //         await expect(
-    //             contractInstance.connect(addr1).mintAllowList(1, overrides)
-    //         ).to.be.revertedWith("Ether value sent is not correct");
-    //     });
+        it("Should be reverted because the minting event has not begun", async function () {
+            await contractInstance.setPublicStartDate(addDays(new Date(), 2));
 
-    //     it("Should mint token", async function () {
-    //         const baseurl = "ipfs://test.url/";
-    //         contractInstance.connect(owner).setBaseURI(baseurl);
-    //         await contractInstance.connect(owner).setIsAllowListActive(true);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.123"), // ether in this case MUST be a string
-    //         };
-    //         await contractInstance
-    //             .connect(owner)
-    //             .setAllowList([addr1.address], 1);
-    //         await contractInstance.connect(addr1).mintAllowList(1, overrides);
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance.connect(addr1).publicMint(1, overrides)
+            ).to.be.revertedWith("Not started yet");
+        });
 
-    //         expect(await contractInstance.tokenURI(0)).to.equal(baseurl + "0"); //ipfs://test.url/0
-    //         expect(await contractInstance.ownerOf(0)).to.equal(addr1.address);
-    //     });
-    // });
+        it("Should be reverted because the caller exceeds max token", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("5"),
+            };
 
-    // describe("setProvenance", function () {
-    //     it("Should be reverted because the caller is not owner", async function () {
-    //         await expect(
-    //             contractInstance.connect(addr1).setProvenance("random hash")
-    //         ).to.be.revertedWith("caller is not the owner");
-    //     });
+            //5 token each time * 2000 = 10 000
+            for (let i = 0; i < 200; i++) {
+                await contractInstance.connect(addr1).publicMint(5, overrides);
+            }
 
-    //     it("Should should set PROVENANCE by owner", async function () {
-    //         const expectedValue = "random hash";
+            await expect(
+                contractInstance.connect(addr1).publicMint(1, overrides)
+            ).to.be.revertedWith("Not enough left to mint");
+        });
 
-    //         await contractInstance.connect(owner).setProvenance(expectedValue);
+        it("Should mint token", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
 
-    //         expect(await contractInstance.PROVENANCE()).to.equal(expectedValue);
-    //     });
-    // });
-
-    // describe("reserve", function () {
-    //     it("Should be reverted because the caller is not owner", async function () {
-    //         await expect(
-    //             contractInstance.connect(addr1).reserve(1)
-    //         ).to.be.revertedWith("caller is not the owner");
-    //     });
-
-    //     it("Should reserve tokens by owner", async function () {
-    //         const baseurl = "ipfs://test.url/";
-    //         contractInstance.connect(owner).setBaseURI(baseurl);
-    //         await contractInstance.connect(owner).reserve(5);
-    //         for (let i = 0; i < 5; i++) {
-    //             expect(await contractInstance.tokenURI(i)).to.equal(
-    //                 baseurl + i
-    //             );
-    //         }
-    //     });
-    // });
-
-    // describe("setSaleState", function () {
-    //     it("Should be reverted because the caller is not owner", async function () {
-    //         await expect(
-    //             contractInstance.connect(addr1).setSaleState(true)
-    //         ).to.be.revertedWith("caller is not the owner");
-    //     });
-
-    //     it("Should should set saleIsActive by owner", async function () {
-    //         const expectedValue = true;
-
-    //         await contractInstance.connect(owner).setSaleState(expectedValue);
-
-    //         expect(await contractInstance.saleIsActive()).to.equal(
-    //             expectedValue
-    //         );
-    //     });
-    // });
-
-    // describe("mint", function () {
-    //     it("Should be reverted because the saleIsActive is false", async function () {
-    //         await contractInstance.connect(owner).setSaleState(false);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.123"), // ether in this case MUST be a string
-    //         };
-    //         await expect(
-    //             contractInstance.connect(addr1).mint(1, overrides)
-    //         ).to.be.revertedWith("Sale must be active to mint tokens");
-    //     });
-
-    //     it("Should be reverted if exceeded max token purchase", async function () {
-    //         await contractInstance.connect(owner).setSaleState(true);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.738"), // ether in this case MUST be a string
-    //         };
-
-    //         await expect(
-    //             contractInstance.connect(addr1).mint(6, overrides)
-    //         ).to.be.revertedWith("Exceeded max token purchase");
-    //     });
-
-    //     it("Should be reverted because the caller exceeds max token", async function () {
-    //         await contractInstance.connect(owner).setSaleState(true);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.615"), // ether in this case MUST be a string
-    //         };
-
-    //         //5 token each time * 2000 = 10000
-    //         for (let i = 0; i < 2000; i++) {
-    //             await contractInstance.connect(addr1).mint(5, overrides);
-    //         }
-
-    //         await expect(
-    //             contractInstance.connect(addr1).mint(1, overrides)
-    //         ).to.be.revertedWith("Purchase would exceed max tokens");
-    //     });
-
-    //     it("Should be reverted because the caller do not have enough fund", async function () {
-    //         await contractInstance.connect(owner).setSaleState(true);
-
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.122"), // ether in this case MUST be a string
-    //         };
-    //         await expect(
-    //             contractInstance.connect(addr1).mint(1, overrides)
-    //         ).to.be.revertedWith("Ether value sent is not correct");
-    //     });
-
-    //     it("Should mint token", async function () {
-    //         const baseurl = "ipfs://test.url/";
-    //         contractInstance.connect(owner).setBaseURI(baseurl);
-    //         await contractInstance.connect(owner).setSaleState(true);
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.123"), // ether in this case MUST be a string
-    //         };
-    //         await contractInstance.connect(addr1).mint(1, overrides);
-
-    //         expect(await contractInstance.tokenURI(0)).to.equal(baseurl + "0");
-    //         expect(await contractInstance.ownerOf(0)).to.equal(addr1.address);
-    //     });
-    // });
+            await contractInstance.connect(addr1).publicMint(1, overrides);
+            expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
+        });
+    });
 
     // describe("withdraw", function () {
     //     it("Should be reverted because the caller is not owner", async function () {
@@ -304,7 +201,7 @@ describe("DaoConfigurator", function () {
     //     it("Should withdraw fund by the owner", async function () {
     //         await contractInstance.connect(owner).setSaleState(true);
     //         const overrides = {
-    //             value: ethers.utils.parseEther("5"), // ether in this case MUST be a string
+    //             value: ethers.utils.parseEther("5"),
     //         };
     //         await contractInstance.connect(addr1).mint(1, overrides);
     //         const accountBalanceBeforeWithdraw = ethers.utils.formatEther(
