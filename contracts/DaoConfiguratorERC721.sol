@@ -9,6 +9,13 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "./lib/ERC2981PerTokenRoyalties.sol";
 import "./RandomRequest.sol";
 
+struct WhiteList {
+    bytes32 MERKLE_ROOT;
+    uint256 MAX_WL_CLAIM;
+    uint256 WL_START_DATE;
+    uint256 WL_PRICE;
+}
+
 contract DaoConfiguratorERC721 is
     ERC721Enumerable,
     Ownable,
@@ -23,6 +30,8 @@ contract DaoConfiguratorERC721 is
     bool public HAS_PUBLIC = true;
     bool public HAS_WL;
     bool public RANDOMIZED;
+
+    WhiteList[] public whitelists;
 
     uint256 public constant MAX_PER_CLAIM = 10;
     uint256 public MAX_MINTABLE; // max supply
@@ -39,7 +48,6 @@ contract DaoConfiguratorERC721 is
     uint256 public MAX_WL_CLAIM; // max mint per address for the WL / if 0, their is no limit
     uint256 public WL_START_DATE;
     uint256 public WL_PRICE; // price for WL
-
     bytes32 public MERKLE_ROOT;
 
     mapping(address => uint256) public whiteListMintAddresses;
@@ -80,10 +88,11 @@ contract DaoConfiguratorERC721 is
     //
     //
     //
-    function whiteListMint(uint256 n, bytes32[] calldata _proof)
-        public
-        payable
-    {
+    function whiteListMint(
+        uint256 n,
+        bytes32[] calldata _proof,
+        uint256 position
+    ) public payable {
         // check if event has a WL
         require(HAS_WL, "No whitelist assigned to this project");
 
@@ -91,7 +100,10 @@ contract DaoConfiguratorERC721 is
         require(OPEN_SALES, "It's not possible to claim just yet");
 
         // check WL mint date
-        require(block.timestamp >= WL_START_DATE, "Not started yet");
+        require(
+            block.timestamp >= whitelists[position].WL_START_DATE,
+            "Not started yet"
+        );
 
         // check public mint date
         require(
@@ -110,24 +122,26 @@ contract DaoConfiguratorERC721 is
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         // check if leaf exists in merkle tree (checks if sender is whitelisted)
         require(
-            MerkleProof.verify(_proof, MERKLE_ROOT, leaf),
+            MerkleProof.verify(_proof, whitelists[position].MERKLE_ROOT, leaf),
             "Invalid Merkle Proof"
         );
 
         // check if the value sent is correct
         require(
-            msg.value >= (WL_PRICE * n),
+            msg.value >= (whitelists[position].WL_PRICE * n),
             "Ether value sent is below the price"
         );
 
         // if MAX_WL_CLAIM > 0, we check if the sender has exceeded mint limit
-        if (MAX_WL_CLAIM > 0) {
+        if (whitelists[position].MAX_WL_CLAIM > 0) {
             require(
-                whiteListMintAddresses[msg.sender] <= MAX_WL_CLAIM,
+                whiteListMintAddresses[msg.sender] <=
+                    whitelists[position].MAX_WL_CLAIM,
                 "You can't claim anymore"
             );
             require(
-                n + whiteListMintAddresses[msg.sender] <= MAX_WL_CLAIM,
+                n + whiteListMintAddresses[msg.sender] <=
+                    whitelists[position].MAX_WL_CLAIM,
                 "you can't claim that much"
             );
 
@@ -136,7 +150,7 @@ contract DaoConfiguratorERC721 is
         }
 
         //  check if the tokens sent exceeds the price, in order to return the rest
-        uint256 total_cost = (WL_PRICE * n);
+        uint256 total_cost = (whitelists[position].WL_PRICE * n);
         uint256 excess = msg.value - total_cost;
         payable(address(this)).transfer(total_cost);
 
@@ -407,18 +421,42 @@ contract DaoConfiguratorERC721 is
         HAS_PUBLIC = !HAS_PUBLIC;
     }
 
-    function setWhiteList(
+    function updateWhiteList(
+        uint256 _WL_START_DATE,
+        uint256 _MAX_WL_CLAIM,
+        uint256 _WL_PRICE,
+        bytes32 _MERKLE_ROOT,
+        uint256 position
+    ) external onlyOwner {
+        WhiteList memory whitelist = WhiteList(
+            _MERKLE_ROOT,
+            _WL_START_DATE,
+            _MAX_WL_CLAIM,
+            _WL_PRICE
+        );
+
+        whitelists[position] = whitelist;
+    }
+
+    function addWhiteList(
         uint256 _WL_START_DATE,
         uint256 _MAX_WL_CLAIM,
         uint256 _WL_PRICE,
         bytes32 _MERKLE_ROOT,
         bool _HAS_WL
     ) external onlyOwner {
-        WL_START_DATE = _WL_START_DATE;
-        MAX_WL_CLAIM = _MAX_WL_CLAIM;
-        WL_PRICE = _WL_PRICE;
-        MERKLE_ROOT = _MERKLE_ROOT;
-        HAS_WL = _HAS_WL;
+        WhiteList memory whitelist = WhiteList(
+            _MERKLE_ROOT,
+            _WL_START_DATE,
+            _MAX_WL_CLAIM,
+            _WL_PRICE
+        );
+
+        whitelists.push(whitelist);
+
+        if (!_HAS_WL) {
+            _HAS_WL = true;
+        }
     }
 
     /////////////////////////////////////////////////////////
