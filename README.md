@@ -12,8 +12,8 @@ Set up .env variables:
 
 ```shell
 API_KEY= EXPLORER_APIKEY (snowtrace,etherscan...)
-MAIN_URL= MAINNET_URI
-TEST_URL= TESTNET_URI
+MAIN_URL= MAINNET_URL (exemple: https://api.avax.network/ext/bc/C/rpc)
+TEST_URL= TESTNET_URL (exemple: https://api.avax-test.network/ext/bc/C/rpc)
 PRIVATE_KEY= WALLET_PRIVATE_KEY
 ```
 
