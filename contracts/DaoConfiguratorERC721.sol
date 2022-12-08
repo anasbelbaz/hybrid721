@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.1;
+pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -15,6 +15,7 @@ struct WhiteList {
     uint256 MAX_WL_CLAIM;
     uint256 WL_PRICE;
     bytes32 MERKLE_ROOT;
+    mapping(address => uint256) whiteListMintAddresses;
 }
 
 contract DaoConfiguratorERC721 is
@@ -46,7 +47,6 @@ contract DaoConfiguratorERC721 is
     uint256 public PUBLIC_START_DATE;
     uint256 public PUBLIC_PRICE; // price for public
 
-    mapping(address => uint256) public whiteListMintAddresses;
     mapping(address => uint256) public publicMintedAmount;
     mapping(address => bool) private admins;
 
@@ -107,7 +107,6 @@ contract DaoConfiguratorERC721 is
             "Whitelist sales has ended"
         );
 
-        // cannot mint 0 erc721
         require(n > 0, "Number need to be higher than 0");
         // check if the supply is still enough
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
@@ -131,18 +130,18 @@ contract DaoConfiguratorERC721 is
         // if MAX_WL_CLAIM > 0, we check if the sender has exceeded mint limit
         if (whitelists[position].MAX_WL_CLAIM > 0) {
             require(
-                whiteListMintAddresses[msg.sender] <=
+                whitelists[position].whiteListMintAddresses[msg.sender] <=
                     whitelists[position].MAX_WL_CLAIM,
                 "You can't claim anymore"
             );
             require(
-                n + whiteListMintAddresses[msg.sender] <=
+                n + whitelists[position].whiteListMintAddresses[msg.sender] <=
                     whitelists[position].MAX_WL_CLAIM,
                 "you can't claim that much"
             );
 
             // After the checks, we increments sender mint count
-            whiteListMintAddresses[msg.sender] += n;
+            whitelists[position].whiteListMintAddresses[msg.sender] += n;
         }
 
         //  check if the tokens sent exceeds the price, in order to return the rest
@@ -439,7 +438,7 @@ contract DaoConfiguratorERC721 is
             _MERKLE_ROOT
         );
 
-        whitelists.push(whitelist);
+        whitelists.push();
 
         if (!HAS_WL) {
             HAS_WL = true;
@@ -464,12 +463,14 @@ contract DaoConfiguratorERC721 is
             MerkleProof.verify(_proof, whitelists[position].MERKLE_ROOT, leaf);
     }
 
-    function whiteListMintedCount(address _whitelistedAddress)
+    function whiteListMintedCount(address _whitelistedAddress, uint256 position)
         public
         view
         returns (uint256)
     {
-        uint256 userMinted = whiteListMintAddresses[_whitelistedAddress];
+        uint256 userMinted = whitelists[position].whiteListMintAddresses[
+            _whitelistedAddress
+        ];
         return userMinted;
     }
 
