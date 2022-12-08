@@ -26,5 +26,5 @@ npx hardhat test
 npx hardhat compile
 
 npx hardhat run scripts/deploy.js --network NETWORK_NAME
-npx hardhat verify --constructor-args scripts/arguments.js CONTRACT_ADDRESS
+npx hardhat verify --constructor-args scripts/verifyArguments.js CONTRACT_ADDRESS --network test
 ```

@@ -1,5 +1,5 @@
 const { ethers } = require("hardhat");
-const { args } = require("./arguments");
+const params = require("./params");
 
 async function main() {
     const [deployer] = await ethers.getSigners();
@@ -23,7 +23,7 @@ async function main() {
         _NFT_PUBLIC_PRICE,
         _REVEAL_DATE,
         _MAX_PUBLIC_CLAIM,
-    ] = args;
+    ] = params.args;
 
     const contractInstance = await DaoConfiguratorERC721.deploy(
         _name,
@@ -41,23 +41,23 @@ async function main() {
 
     await contractInstance.deployed();
 
-    // set whiteList
+    const [
+        _WL_START_DATE,
+        _MAX_WL_CLAIM,
+        _WL_NFT_PRICE,
+        _MERKLE_ROOT,
+        _HAS_WL,
+    ] = params.whitelist;
+
     await contractInstance.setWhiteList(
-        1670429163, // wl start date
-        10, // wl max per claim
-        10, // wl nft price
-        "0xe58fd181d2d25aef80ae5646aaf46071d6e24b5e0ec8c890ee392320eee9da6c", // whitelist merkle root
-        true // set wl state to true
+        _WL_START_DATE,
+        _MAX_WL_CLAIM,
+        _WL_NFT_PRICE,
+        _MERKLE_ROOT,
+        _HAS_WL
     );
 
-    const admins = [
-        "0x20dbf6Ad54bdAe76E42Aee8960b7e2E56A053eFf",
-        "0x20dbf6Ad54bdAe76E42Aee8960b7e2E56A053eFf",
-        "0x20dbf6Ad54bdAe76E42Aee8960b7e2E56A053eFf",
-        "0x20dbf6Ad54bdAe76E42Aee8960b7e2E56A053eFf",
-    ];
-
-    await contractInstance.setAdmins(admins);
+    await contractInstance.setAdmins(params.admins);
 
     console.log("DaoConfiguratorERC721 deployed to:", contractInstance.address);
 }
