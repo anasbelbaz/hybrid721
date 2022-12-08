@@ -21,6 +21,7 @@ contract DaoConfiguratorERC721 is
     string private REVEAL_URI = "";
     bool public OPEN_SALES = true;
     bool public HAS_WL = false;
+    bool public RANDOMIZED = false;
 
     uint256 public constant MAX_PER_CLAIM = 10;
     uint256 public MAX_MINTABLE; // max supply
@@ -149,6 +150,11 @@ contract DaoConfiguratorERC721 is
             emit WL_MINT(randomID);
         }
 
+        // mark that the tokens has been randomized in order to call adminMintRandom
+        if (!RANDOMIZED) {
+            RANDOMIZED = true;
+        }
+
         if (excess > 0) {
             // return the rest of tokens to sender
             payable(_msgSender()).transfer(excess);
@@ -195,6 +201,11 @@ contract DaoConfiguratorERC721 is
             _setTokenRoyalty(randomID, ROYALTY_RECIPIENT, ROYALTY_VALUE);
 
             emit MINT(randomID);
+        }
+
+        // mark that the tokens has been randomized in order to call adminMintRandom
+        if (!RANDOMIZED) {
+            RANDOMIZED = true;
         }
 
         if (excess > 0) {
@@ -256,6 +267,10 @@ contract DaoConfiguratorERC721 is
     function adminMint(uint256 n, address adr) external onlyOwner {
         require(n > 0, "Number need to be higher than 0");
         require(n <= MAX_PER_CLAIM, "you can't claim that much at ounce");
+        require(
+            !RANDOMIZED,
+            "can't mint in order, tokens have already been randomized"
+        );
 
         for (uint256 i = 0; i < n; i++) {
             uint256 ID = _randomize(false) + mintIndexStart;
@@ -274,6 +289,11 @@ contract DaoConfiguratorERC721 is
             _safeMint(adr, randomID);
             _setTokenRoyalty(randomID, ROYALTY_RECIPIENT, ROYALTY_VALUE);
             emit MINT(randomID);
+        }
+
+        // mark that the tokens has been randomized in order to call adminMintRandom
+        if (!RANDOMIZED) {
+            RANDOMIZED = true;
         }
     }
 
