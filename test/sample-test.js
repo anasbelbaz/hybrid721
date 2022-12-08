@@ -108,17 +108,17 @@ describe("DaoConfigurator", function () {
     });
 
     describe("WhitelistMint", function () {
-
         it("Should be reverted because the HAS_WL is false", async function () {
-            
             const claimingAddress = keccak256(addr1.address);
             const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.ToggleHasWL();
+            await contractInstance.toggleHasWL();
             const overrides = {
                 value: ethers.utils.parseEther("1"),
             };
             await expect(
-                contractInstance.connect(addr1).whiteListMint(1, hexProof, overrides)
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, overrides)
             ).to.be.revertedWith("No whitelist assigned to this project");
         });
 
@@ -132,7 +132,9 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
             await expect(
-                contractInstance.connect(addr1).whiteListMint(1, hexProof, overrides)
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, overrides)
             ).to.be.revertedWith("It's not possible to claim just yet");
         });
 
@@ -145,7 +147,9 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
             await expect(
-                contractInstance.connect(addr1).whiteListMint(1, hexProof, overrides)
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, overrides)
             ).to.be.revertedWith("Not started yet");
         });
 
@@ -159,8 +163,12 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
             await expect(
-                contractInstance.connect(addr1).whiteListMint(1, hexProof, overrides)
-            ).to.be.revertedWith("Public mint is open, the whitelist mint is over");
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, overrides)
+            ).to.be.revertedWith(
+                "Public mint is open, the whitelist mint is over"
+            );
         });
 
         it("Should be reverted if exceeded max token purchase", async function () {
@@ -173,7 +181,9 @@ describe("DaoConfigurator", function () {
             };
 
             await expect(
-                contractInstance.connect(addr1).whiteListMint(11, hexProof, overrides)
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(11, hexProof, overrides)
             ).to.be.revertedWith("you can't claim that much at once");
         });
 
@@ -181,12 +191,14 @@ describe("DaoConfigurator", function () {
             const claimingAddress = keccak256(addr1.address);
             const hexProof = merkleTree.getHexProof(claimingAddress);
             await contractInstance.setPublicStartDate(addDays(new Date(), 2));
-            
+
             const overrides = {
                 value: ethers.utils.parseEther("0.01"),
             };
             await expect(
-                contractInstance.connect(addr1).whiteListMint(1, hexProof, overrides)
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, overrides)
             ).to.be.revertedWith("Ether value sent is below the price");
         });
 
@@ -194,14 +206,15 @@ describe("DaoConfigurator", function () {
             const claimingAddress = keccak256(addr1.address);
             const hexProof = merkleTree.getHexProof(claimingAddress);
             await contractInstance.setPublicStartDate(addDays(new Date(), 2));
-            
+
             const overrides = {
                 value: ethers.utils.parseEther("5"),
             };
 
-
             await expect(
-                contractInstance.connect(addr1).whiteListMint(11, hexProof, overrides)
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(11, hexProof, overrides)
             ).to.be.revertedWith("you can't claim that much");
         });
 
@@ -213,11 +226,11 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
 
-            await contractInstance.connect(addr1).whiteListMint(1, hexProof, overrides);
+            await contractInstance
+                .connect(addr1)
+                .whiteListMint(1, hexProof, overrides);
             expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
         });
-
-        
     });
 
     describe("setBaseURI", function () {
@@ -244,6 +257,16 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance.connect(addr1).publicMint(1, overrides)
             ).to.be.revertedWith("It's not possible to claim just yet");
+        });
+
+        it("Should be reverted because the Has_Public is false", async function () {
+            await contractInstance.connect(owner).toggleHasPublic();
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance.connect(addr1).publicMint(1, overrides)
+            ).to.be.revertedWith("No public sale assigned to this project");
         });
 
         it("Should be reverted if exceeded max token purchase", async function () {
@@ -301,11 +324,10 @@ describe("DaoConfigurator", function () {
         });
 
         it("Should be possible to free mint", async function () {
-            await contractInstance.setPublicPrice(ethers.utils.parseEther("0"))
+            await contractInstance.setPublicPrice(ethers.utils.parseEther("0"));
             await contractInstance.connect(addr1).publicMint(1);
             expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
         });
-        
     });
 
     describe("withdraw", function () {

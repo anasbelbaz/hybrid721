@@ -20,8 +20,9 @@ contract DaoConfiguratorERC721 is
     string public BASE_URI = "";
     string private REVEAL_URI = "";
     bool public OPEN_SALES = true;
-    bool public HAS_WL = false;
-    bool public RANDOMIZED = false;
+    bool public HAS_PUBLIC = true;
+    bool public HAS_WL;
+    bool public RANDOMIZED;
 
     uint256 public constant MAX_PER_CLAIM = 10;
     uint256 public MAX_MINTABLE; // max supply
@@ -169,6 +170,7 @@ contract DaoConfiguratorERC721 is
     //
     //
     function publicMint(uint256 n) public payable {
+        require(HAS_PUBLIC, "No public sale assigned to this project");
         require(OPEN_SALES, "It's not possible to claim just yet");
         require(block.timestamp >= PUBLIC_START_DATE, "Not started yet");
         require(n > 0, "Number need to be higher than 0");
@@ -397,8 +399,12 @@ contract DaoConfiguratorERC721 is
         }
     }
 
-    function ToggleHasWL() external onlyOwner {
+    function toggleHasWL() external onlyOwner {
         HAS_WL = !HAS_WL;
+    }
+
+    function toggleHasPublic() external onlyOwner {
+        HAS_PUBLIC = !HAS_PUBLIC;
     }
 
     function setWhiteList(
