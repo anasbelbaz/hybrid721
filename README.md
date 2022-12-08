@@ -2,6 +2,21 @@
 
 This project demonstrates a basic ERC721 use case. It comes with a sample contract, tests for that contract, a script that deploys that contract, and code sample to interact with the contract using js and ethers library.
 
+Installation:
+
+```shell
+yarn install or npm install
+```
+
+Set up .env variables:
+
+```shell
+API_KEY= EXPLORER_APIKEY (snowtrace,etherscan...)
+MAIN_URL= MAINNET_URI
+TEST_URL= TESTNET_URI
+PRIVATE_KEY= WALLET_PRIVATE_KEY
+```
+
 Try running some of the following tasks:
 
 ```shell
