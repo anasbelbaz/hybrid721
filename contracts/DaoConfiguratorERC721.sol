@@ -19,12 +19,12 @@ contract DaoConfiguratorERC721 is
 
     string public BASE_URI = "";
     string private REVEAL_URI = "";
-    uint256 public mintIndexStart = 1;
     bool public OPEN_SALES = true;
     bool public HAS_WL = false;
 
     uint256 public constant MAX_PER_CLAIM = 10;
     uint256 public MAX_MINTABLE; // max supply
+    uint256 public mintIndexStart = 1;
     uint256 private REVEAL_DATE;
 
     address private ROYALTY_RECIPIENT;
@@ -63,11 +63,11 @@ contract DaoConfiguratorERC721 is
         MAX_MINTABLE = _MAX_MINTABLE;
         BASE_URI = _baseTokenURI;
         REVEAL_URI = _revealURI;
+        REVEAL_DATE = _REVEAL_DATE;
         ROYALTY_RECIPIENT = _ROYALTY_RECIPIENT;
         ROYALTY_VALUE = _ROYALTY_VALUE;
         PUBLIC_START_DATE = _START_DATE;
         PUBLIC_NFT_PRICE = _NFT_PUBLIC_PRICE;
-        REVEAL_DATE = _REVEAL_DATE;
         MAX_PUBLIC_CLAIM = _MAX_PUBLIC_CLAIM;
     }
 
@@ -86,7 +86,7 @@ contract DaoConfiguratorERC721 is
         require(HAS_WL, "No whitelist assigned to this project");
 
         // check if mint event is open or closed
-        require(OPEN_SALES, "It's not possible to claim just yet.");
+        require(OPEN_SALES, "It's not possible to claim just yet");
 
         // check WL mint date
         require(block.timestamp >= WL_START_DATE, "Not started yet");
@@ -100,7 +100,7 @@ contract DaoConfiguratorERC721 is
         // cannot mint 0 erc721
         require(n > 0, "Number need to be higher than 0");
         // check if the supply is still enough
-        require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint.");
+        require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
         // check the mint amount (should not exceed MAX_PER_CLAIM)
         require(n <= MAX_PER_CLAIM, "you can't claim that much at ounce");
 
@@ -109,7 +109,7 @@ contract DaoConfiguratorERC721 is
         // check if leaf exists in merkle tree (checks if sender is whitelisted)
         require(
             MerkleProof.verify(_proof, MERKLE_ROOT, leaf),
-            "Invalid Merkle Proof."
+            "Invalid Merkle Proof"
         );
 
         // check if the value sent is correct
@@ -122,11 +122,11 @@ contract DaoConfiguratorERC721 is
         if (MAX_WL_CLAIM > 0) {
             require(
                 whiteListMintAddresses[msg.sender] <= MAX_WL_CLAIM,
-                "You can't early claim anymore"
+                "You can't claim anymore"
             );
             require(
                 n + whiteListMintAddresses[msg.sender] <= MAX_WL_CLAIM,
-                "you can't early claim that much"
+                "you can't claim that much"
             );
 
             // After the checks, we increments sender mint count
@@ -163,10 +163,10 @@ contract DaoConfiguratorERC721 is
     //
     //
     function publicMint(uint256 n) public payable {
-        require(OPEN_SALES, "It's not possible to claim just yet.");
+        require(OPEN_SALES, "It's not possible to claim just yet");
         require(block.timestamp >= PUBLIC_START_DATE, "Not started yet");
         require(n > 0, "Number need to be higher than 0");
-        require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint.");
+        require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
         require(n <= MAX_PER_CLAIM, "you can't claim that much at ounce");
         require(
             msg.value >= (PUBLIC_NFT_PRICE * n),
@@ -175,7 +175,7 @@ contract DaoConfiguratorERC721 is
         if (MAX_PUBLIC_CLAIM > 0) {
             require(
                 publicMintedAmount[msg.sender] < MAX_PUBLIC_CLAIM,
-                "exceeds the public minting limit"
+                "amount exceeds the public minting limit"
             );
             require(
                 n + publicMintedAmount[msg.sender] <= MAX_PUBLIC_CLAIM,
@@ -253,7 +253,7 @@ contract DaoConfiguratorERC721 is
     //
     //
 
-    function AdminMint(uint256 n, address adr) external onlyOwner {
+    function adminMint(uint256 n, address adr) external onlyOwner {
         require(n > 0, "Number need to be higher than 0");
         require(n <= MAX_PER_CLAIM, "you can't claim that much at ounce");
 
@@ -265,7 +265,7 @@ contract DaoConfiguratorERC721 is
         }
     }
 
-    function AdminMintRandom(uint256 n, address adr) external onlyOwner {
+    function adminRandomMint(uint256 n, address adr) external onlyOwner {
         require(n > 0, "Number need to be higher than 0");
         require(n <= MAX_PER_CLAIM, "you can't claim that much at ounce");
 

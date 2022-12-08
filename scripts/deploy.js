@@ -1,9 +1,5 @@
 const { ethers } = require("hardhat");
 
-//helpers
-// npx hardhat verify --constructor-args scripts/arguments.ts 0x95Cc015c59A70CA26547A6bc86a8Ce210aa37Ee7
-// npx hardhat run scripts/deploy.js --network test
-
 async function main() {
     const [deployer] = await ethers.getSigners();
 
