@@ -32,11 +32,11 @@ contract DaoConfiguratorERC721 is
 
     uint256 public MAX_PUBLIC_CLAIM; // max mint per address for the public / if 0, their is no limit
     uint256 public PUBLIC_START_DATE;
-    uint256 public PUBLIC_NFT_PRICE; // price for public
+    uint256 public PUBLIC_PRICE; // price for public
 
     uint256 public MAX_WL_CLAIM; // max mint per address for the WL / if 0, their is no limit
     uint256 public WL_START_DATE;
-    uint256 public WL_NFT_PRICE; // price for WL
+    uint256 public WL_PRICE; // price for WL
 
     bytes32 public MERKLE_ROOT;
 
@@ -56,7 +56,7 @@ contract DaoConfiguratorERC721 is
         address _ROYALTY_RECIPIENT,
         uint256 _ROYALTY_VALUE,
         uint256 _START_DATE,
-        uint256 _NFT_PUBLIC_PRICE,
+        uint256 _PUBLIC_PRICE,
         uint256 _REVEAL_DATE,
         uint256 _MAX_PUBLIC_CLAIM
     ) ERC721(_name, _symbol) Ownable() RandomRequest(_MAX_MINTABLE) {
@@ -67,7 +67,7 @@ contract DaoConfiguratorERC721 is
         ROYALTY_RECIPIENT = _ROYALTY_RECIPIENT;
         ROYALTY_VALUE = _ROYALTY_VALUE;
         PUBLIC_START_DATE = _START_DATE;
-        PUBLIC_NFT_PRICE = _NFT_PUBLIC_PRICE;
+        PUBLIC_PRICE = _PUBLIC_PRICE;
         MAX_PUBLIC_CLAIM = _MAX_PUBLIC_CLAIM;
     }
 
@@ -102,7 +102,7 @@ contract DaoConfiguratorERC721 is
         // check if the supply is still enough
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
         // check the mint amount (should not exceed MAX_PER_CLAIM)
-        require(n <= MAX_PER_CLAIM, "you can't claim that much at ounce");
+        require(n <= MAX_PER_CLAIM, "you can't claim that much at once");
 
         // create the leaf with sender address
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
@@ -114,7 +114,7 @@ contract DaoConfiguratorERC721 is
 
         // check if the value sent is correct
         require(
-            msg.value >= (WL_NFT_PRICE * n),
+            msg.value >= (WL_PRICE * n),
             "Ether value sent is below the price"
         );
 
@@ -134,7 +134,7 @@ contract DaoConfiguratorERC721 is
         }
 
         //  check if the tokens sent exceeds the price, in order to return the rest
-        uint256 total_cost = (WL_NFT_PRICE * n);
+        uint256 total_cost = (WL_PRICE * n);
         uint256 excess = msg.value - total_cost;
         payable(address(this)).transfer(total_cost);
 
@@ -169,7 +169,7 @@ contract DaoConfiguratorERC721 is
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
         require(n <= MAX_PER_CLAIM, "you can't claim that much at once");
         require(
-            msg.value >= (PUBLIC_NFT_PRICE * n),
+            msg.value >= (PUBLIC_PRICE * n),
             "Ether value sent is below the price"
         );
         if (MAX_PUBLIC_CLAIM > 0) {
@@ -184,7 +184,7 @@ contract DaoConfiguratorERC721 is
             publicMintedAmount[msg.sender] += n;
         }
 
-        uint256 total_cost = (PUBLIC_NFT_PRICE * n);
+        uint256 total_cost = (PUBLIC_PRICE * n);
 
         uint256 excess = msg.value - total_cost;
         payable(address(this)).transfer(total_cost);
@@ -331,6 +331,14 @@ contract DaoConfiguratorERC721 is
     //
     //
 
+    function setWLPrice(uint256 _price) external onlyOwner {
+        WL_PRICE = _price;
+    }
+
+    function setPublicPrice(uint256 _price) external onlyOwner {
+        PUBLIC_PRICE = _price;
+    }
+
     function setMerkleRoot(bytes32 _root) external onlyOwner {
         MERKLE_ROOT = _root;
     }
@@ -369,16 +377,20 @@ contract DaoConfiguratorERC721 is
         }
     }
 
+    function ToggleHasWL() external onlyOwner {
+        HAS_WL = !HAS_WL;
+    }
+
     function setWhiteList(
         uint256 _WL_START_DATE,
         uint256 _MAX_WL_CLAIM,
-        uint256 _WL_NFT_PRICE,
+        uint256 _WL_PRICE,
         bytes32 _MERKLE_ROOT,
         bool _HAS_WL
     ) external onlyOwner {
         WL_START_DATE = _WL_START_DATE;
         MAX_WL_CLAIM = _MAX_WL_CLAIM;
-        WL_NFT_PRICE = _WL_NFT_PRICE;
+        WL_PRICE = _WL_PRICE;
         MERKLE_ROOT = _MERKLE_ROOT;
         HAS_WL = _HAS_WL;
     }
@@ -417,7 +429,7 @@ contract DaoConfiguratorERC721 is
     //
 
     function withdraw() external {
-        require(admins[_msgSender()] == true, "Your are not the owner");
+        require(admins[_msgSender()] == true, "Your are not admin");
         require(address(this).balance > 0, "Nothing to withdraw");
         payable(_msgSender()).transfer(address(this).balance);
     }
