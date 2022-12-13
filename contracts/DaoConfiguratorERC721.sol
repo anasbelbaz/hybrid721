@@ -131,11 +131,11 @@ contract DaoConfiguratorERC721 is
 
         // if MAX_WL_CLAIM > 0, we check if the sender has exceeded mint limit
         if (whitelists[position].MAX_WL_CLAIM > 0) {
-            require(
-                whiteListMintAddresses[position][msg.sender] <=
-                    whitelists[position].MAX_WL_CLAIM,
-                "You can't claim anymore"
-            );
+            // require(
+            //     whiteListMintAddresses[position][msg.sender] <=
+            //         whitelists[position].MAX_WL_CLAIM,
+            //     "You can't claim anymore"
+            // );
             require(
                 n + whiteListMintAddresses[position][msg.sender] <=
                     whitelists[position].MAX_WL_CLAIM,
