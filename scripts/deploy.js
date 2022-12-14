@@ -45,6 +45,7 @@ async function main() {
         _WL_START_DATE,
         _MAX_WL_CLAIM,
         _WL_NFT_PRICE,
+        _WL_ERC20_PRICE,
         _MERKLE_ROOT,
         _HAS_WL,
     ] = params.whitelist;
@@ -53,6 +54,7 @@ async function main() {
         _WL_START_DATE,
         _MAX_WL_CLAIM,
         _WL_NFT_PRICE,
+        _WL_ERC20_PRICE,
         _MERKLE_ROOT,
         _HAS_WL
     );
@@ -60,6 +62,14 @@ async function main() {
     await contractInstance.setAdmins(params.admins);
 
     console.log("DaoConfiguratorERC721 deployed to:", contractInstance.address);
+
+    const MyTokenTest = await ethers.getContractFactory(
+        "MyTokenTest"
+    );
+
+    const contractErc20 = await MyTokenTest.deploy();
+    console.log("MyTokenTest deployed to:", contractErc20.address);
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere

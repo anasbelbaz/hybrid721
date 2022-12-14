@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./lib/ERC2981PerTokenRoyalties.sol";
 import "./RandomRequest.sol";
 
@@ -14,6 +15,7 @@ struct WhiteList {
     uint256 WL_END_DATE;
     uint256 MAX_WL_CLAIM;
     uint256 WL_PRICE;
+    uint256 WL_ERC20_PUBLIC_PRICE;
     bytes32 MERKLE_ROOT;
 }
 
@@ -55,6 +57,9 @@ contract DaoConfiguratorERC721 is
     event WL_MINT(uint256 indexed _id);
     event MINT(uint256 indexed _id);
 
+    IERC20 public erc20Token;
+    uint256 ERC20_PUBLIC_PRICE;
+
     constructor(
         string memory _name,
         string memory _symbol,
@@ -89,87 +94,87 @@ contract DaoConfiguratorERC721 is
     function whiteListMint(
         uint256 n,
         bytes32[] calldata _proof,
-        uint256 position
+        uint256 position,
+        bool erc20Currency
     ) public payable {
-        // check if event has a WL
         require(HAS_WL, "No whitelist assigned to this project");
 
-        // check if mint event is open or closed
         require(OPEN_SALES, "It's not possible to claim just yet");
 
-        // check WL start date
         require(
             block.timestamp >= whitelists[position].WL_START_DATE,
             "Not started yet"
         );
 
-        // check WL end date
         require(
             block.timestamp < whitelists[position].WL_END_DATE,
             "Whitelist sales has ended"
         );
 
         require(n > 0, "Number need to be higher than 0");
-        // check if the supply is still enough
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
-        // check the mint amount (should not exceed MAX_PER_CLAIM)
         require(n <= MAX_PER_CLAIM, "you can't claim that much at once");
 
-        // create the leaf with sender address
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
-        // check if leaf exists in merkle tree (checks if sender is whitelisted)
         require(
             MerkleProof.verify(_proof, whitelists[position].MERKLE_ROOT, leaf),
             "Invalid Merkle Proof"
         );
 
-        // check if the value sent is correct
-        require(
-            msg.value >= (whitelists[position].WL_PRICE * n),
-            "Ether value sent is below the price"
-        );
+        if (erc20Currency) {
+            require(
+                GetAllowance() >=
+                    (n * whitelists[position].WL_ERC20_PUBLIC_PRICE),
+                "You dont have enough ERC20"
+            );
+        } else {
+            require(
+                msg.value >= (whitelists[position].WL_PRICE * n),
+                "Ether value sent is below the price"
+            );
+        }
 
-        // if MAX_WL_CLAIM > 0, we check if the sender has exceeded mint limit
         if (whitelists[position].MAX_WL_CLAIM > 0) {
-            // require(
-            //     whiteListMintAddresses[position][msg.sender] <=
-            //         whitelists[position].MAX_WL_CLAIM,
-            //     "You can't claim anymore"
-            // );
             require(
                 n + whiteListMintAddresses[position][msg.sender] <=
                     whitelists[position].MAX_WL_CLAIM,
                 "you can't claim that much"
             );
 
-            // After the checks, we increments sender mint count
             whiteListMintAddresses[position][msg.sender] += n;
         }
 
-        //  check if the tokens sent exceeds the price, in order to return the rest
-        uint256 total_cost = (whitelists[position].WL_PRICE * n);
-        uint256 excess = msg.value - total_cost;
-        payable(address(this)).transfer(total_cost);
+        uint256 excess;
+
+        if (erc20Currency) {
+            erc20Token.transferFrom(
+                msg.sender,
+                address(this),
+                (n * whitelists[position].WL_ERC20_PUBLIC_PRICE)
+            );
+        } else {
+            uint256 total_cost = (whitelists[position].WL_PRICE * n);
+
+            excess = msg.value - total_cost;
+            payable(address(this)).transfer(total_cost);
+        }
 
         for (uint256 i = 0; i < n; i++) {
-            // get random tokenID
             uint256 randomID = _randomize(true) + mintIndexStart;
-            // mint random token
             _safeMint(_msgSender(), randomID);
-            // set royalty value and recipient for this tokenID
             _setTokenRoyalty(randomID, ROYALTY_RECIPIENT, ROYALTY_VALUE);
 
             emit WL_MINT(randomID);
         }
 
-        // mark that the tokens has been randomized in order to call adminMintRandom
         if (!RANDOMIZED) {
             RANDOMIZED = true;
         }
 
-        if (excess > 0) {
-            // return the rest of tokens to sender
-            payable(_msgSender()).transfer(excess);
+        if (!erc20Currency) {
+            if (excess > 0) {
+                payable(_msgSender()).transfer(excess);
+            }
         }
     }
 
@@ -180,17 +185,26 @@ contract DaoConfiguratorERC721 is
     //
     //
     //
-    function publicMint(uint256 n) public payable {
+    function publicMint(uint256 n, bool erc20Currency) public payable {
         require(HAS_PUBLIC, "No public sale assigned to this project");
         require(OPEN_SALES, "It's not possible to claim just yet");
         require(block.timestamp >= PUBLIC_START_DATE, "Not started yet");
         require(n > 0, "Number need to be higher than 0");
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
         require(n <= MAX_PER_CLAIM, "you can't claim that much at once");
-        require(
-            msg.value >= (PUBLIC_PRICE * n),
-            "Ether value sent is below the price"
-        );
+
+        if (erc20Currency) {
+            require(
+                GetAllowance() >= (n * ERC20_PUBLIC_PRICE),
+                "You dont have enough ERC20"
+            );
+        } else {
+            require(
+                msg.value >= (PUBLIC_PRICE * n),
+                "Ether value sent is below the price"
+            );
+        }
+
         if (MAX_PUBLIC_CLAIM > 0) {
             require(
                 publicMintedAmount[msg.sender] < MAX_PUBLIC_CLAIM,
@@ -203,10 +217,20 @@ contract DaoConfiguratorERC721 is
             publicMintedAmount[msg.sender] += n;
         }
 
-        uint256 total_cost = (PUBLIC_PRICE * n);
+        uint256 excess;
 
-        uint256 excess = msg.value - total_cost;
-        payable(address(this)).transfer(total_cost);
+        if (erc20Currency) {
+            erc20Token.transferFrom(
+                msg.sender,
+                address(this),
+                (n * ERC20_PUBLIC_PRICE)
+            );
+        } else {
+            uint256 total_cost = (PUBLIC_PRICE * n);
+
+            excess = msg.value - total_cost;
+            payable(address(this)).transfer(total_cost);
+        }
 
         for (uint256 i = 0; i < n; i++) {
             uint256 randomID = _randomize(true) + mintIndexStart;
@@ -221,8 +245,10 @@ contract DaoConfiguratorERC721 is
             RANDOMIZED = true;
         }
 
-        if (excess > 0) {
-            payable(_msgSender()).transfer(excess);
+        if (!erc20Currency) {
+            if (excess > 0) {
+                payable(_msgSender()).transfer(excess);
+            }
         }
     }
 
@@ -406,11 +432,16 @@ contract DaoConfiguratorERC721 is
         HAS_PUBLIC = !HAS_PUBLIC;
     }
 
+    function setERC20ContractAddress(address _erc20) external onlyOwner {
+        erc20Token = IERC20(_erc20);
+    }
+
     function updateWhiteList(
         uint256 _WL_START_DATE,
         uint256 _WL_END_DATE,
         uint256 _MAX_WL_CLAIM,
         uint256 _WL_PRICE,
+        uint256 _WL_ERC20_PUBLIC_PRICE,
         bytes32 _MERKLE_ROOT,
         uint256 position
     ) external onlyOwner {
@@ -419,6 +450,7 @@ contract DaoConfiguratorERC721 is
             _WL_END_DATE,
             _MAX_WL_CLAIM,
             _WL_PRICE,
+            _WL_ERC20_PUBLIC_PRICE,
             _MERKLE_ROOT
         );
 
@@ -430,6 +462,7 @@ contract DaoConfiguratorERC721 is
         uint256 _WL_END_DATE,
         uint256 _MAX_WL_CLAIM,
         uint256 _WL_PRICE,
+        uint256 _WL_ERC20_PUBLIC_PRICE,
         bytes32 _MERKLE_ROOT
     ) external onlyOwner {
         WhiteList memory whitelist = WhiteList(
@@ -437,6 +470,7 @@ contract DaoConfiguratorERC721 is
             _WL_END_DATE,
             _MAX_WL_CLAIM,
             _WL_PRICE,
+            _WL_ERC20_PUBLIC_PRICE,
             _MERKLE_ROOT
         );
 
@@ -476,6 +510,14 @@ contract DaoConfiguratorERC721 is
         return userMinted;
     }
 
+    function GetAllowance() public view returns (uint256) {
+        return erc20Token.allowance(msg.sender, address(this));
+    }
+
+    function getContractERC20Balance() public view returns (uint256) {
+        return erc20Token.balanceOf(address(this));
+    }
+
     /////////////////////////////////////////////////////////
     //
     //
@@ -488,6 +530,12 @@ contract DaoConfiguratorERC721 is
         require(admins[_msgSender()] == true, "Your are not admin");
         require(address(this).balance > 0, "Nothing to withdraw");
         payable(_msgSender()).transfer(address(this).balance);
+    }
+
+    function withdrawERC20() external {
+        require(admins[_msgSender()] == true, "Your are not the owner");
+        require(getContractERC20Balance() > 0, "Nothing to withdraw");
+        erc20Token.transfer(_msgSender(), getContractERC20Balance());
     }
 
     receive() external payable {}

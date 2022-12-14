@@ -10,7 +10,10 @@ const addDays = (days) => {
 };
 
 describe("DaoConfigurator", function () {
-    let DaoConfigurator,
+    let 
+        MyTokenTest,
+        ContractInstanceERC20,
+        DaoConfigurator,
         contractInstance,
         owner,
         addr1,
@@ -22,6 +25,12 @@ describe("DaoConfigurator", function () {
         merkleTree1;
 
     beforeEach(async function () {
+        MyTokenTest = await ethers.getContractFactory(
+            "MyTokenTest"
+        );
+
+        ContractInstanceERC20 = await MyTokenTest.deploy();
+
         DaoConfigurator = await ethers.getContractFactory(
             "DaoConfiguratorERC721"
         );
@@ -58,6 +67,7 @@ describe("DaoConfigurator", function () {
             addDays(1),
             10,
             ethers.utils.parseEther("1"),
+            10,
             merkleTree0.getHexRoot()
         );
 
@@ -74,6 +84,7 @@ describe("DaoConfigurator", function () {
             addDays(1),
             10,
             ethers.utils.parseEther("1"),
+            10,
             merkleTree1.getHexRoot()
         );
     });
@@ -176,7 +187,7 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, 0, overrides)
+                    .whiteListMint(1, hexProof, 0, false, overrides)
             ).to.be.revertedWith("No whitelist assigned to this project");
         });
 
@@ -192,7 +203,7 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, 0, overrides)
+                    .whiteListMint(1, hexProof, 0, false, overrides)
             ).to.be.revertedWith("It's not possible to claim just yet");
         });
 
@@ -206,6 +217,7 @@ describe("DaoConfigurator", function () {
                     addDays(1),
                     10,
                     ethers.utils.parseEther("1"),
+                    10,
                     merkleTree0.getHexRoot(),
                     0
                 );
@@ -216,7 +228,7 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, 0, overrides)
+                    .whiteListMint(1, hexProof, 0, false, overrides)
             ).to.be.revertedWith("Not started yet");
         });
 
@@ -231,6 +243,7 @@ describe("DaoConfigurator", function () {
                     801,
                     10,
                     ethers.utils.parseEther("1"),
+                    10,
                     merkleTree0.getHexRoot(),
                     0
                 );
@@ -241,7 +254,7 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, 0, overrides)
+                    .whiteListMint(1, hexProof, 0, false, overrides)
             ).to.be.revertedWith("Whitelist sales has ended");
         });
 
@@ -256,7 +269,7 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, 1, overrides)
+                    .whiteListMint(1, hexProof, 1, false, overrides)
             ).to.be.revertedWith("Invalid Merkle Proof");
         });
 
@@ -273,12 +286,12 @@ describe("DaoConfigurator", function () {
 
             await contractInstance
                 .connect(addr1)
-                .whiteListMint(1, hexProof0, 0, overrides);
+                .whiteListMint(1, hexProof0, 0, false, overrides);
             expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
 
             await contractInstance
                 .connect(addr3)
-                .whiteListMint(1, hexProof1, 1, overrides);
+                .whiteListMint(1, hexProof1, 1, false, overrides);
             expect(await contractInstance.balanceOf(addr3.address)).to.equal(1);
         });
 
@@ -293,14 +306,14 @@ describe("DaoConfigurator", function () {
 
             await contractInstance
                 .connect(addr4)
-                .whiteListMint(10, hexProof0, 0, overrides);
+                .whiteListMint(10, hexProof0, 0, false, overrides);
             expect(await contractInstance.balanceOf(addr4.address)).to.equal(
                 10
             );
 
             await contractInstance
                 .connect(addr4)
-                .whiteListMint(10, hexProof1, 1, overrides);
+                .whiteListMint(10, hexProof1, 1, false, overrides);
             expect(await contractInstance.balanceOf(addr4.address)).to.equal(
                 20
             );
@@ -308,13 +321,13 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr4)
-                    .whiteListMint(1, hexProof0, 0, overrides)
+                    .whiteListMint(1, hexProof0, 0, false, overrides)
             ).to.be.revertedWith("you can't claim that much");
 
             await expect(
                 contractInstance
                     .connect(addr4)
-                    .whiteListMint(1, hexProof1, 1, overrides)
+                    .whiteListMint(1, hexProof1, 1, false, overrides)
             ).to.be.revertedWith("you can't claim that much");
         });
 
@@ -329,7 +342,7 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(11, hexProof, 0, overrides)
+                    .whiteListMint(11, hexProof, 0, false, overrides)
             ).to.be.revertedWith("you can't claim that much at once");
         });
 
@@ -343,9 +356,9 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, 0, overrides)
+                    .whiteListMint(1, hexProof, 0, false, overrides)
             ).to.be.revertedWith("Ether value sent is below the price");
-        });
+        }); 
 
         it("Should be reverted because the caller exceeds max token per address", async function () {
             const claimingAddress = keccak256(addr1.address);
@@ -358,7 +371,7 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(11, hexProof, 0, overrides)
+                    .whiteListMint(11, hexProof, 0, false, overrides)
             ).to.be.revertedWith("you can't claim that much");
         });
 
@@ -372,7 +385,7 @@ describe("DaoConfigurator", function () {
 
             await contractInstance
                 .connect(addr1)
-                .whiteListMint(10, hexProof, 0, overrides);
+                .whiteListMint(10, hexProof, 0, false, overrides);
 
             expect(
                 await contractInstance.whiteListMintedCount(addr1.address, 0)
@@ -389,7 +402,7 @@ describe("DaoConfigurator", function () {
 
             await contractInstance
                 .connect(addr1)
-                .whiteListMint(1, hexProof, 0, overrides);
+                .whiteListMint(1, hexProof, 0, false, overrides);
             expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
         });
     });
@@ -401,17 +414,17 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
             await expect(
-                contractInstance.connect(addr1).publicMint(1, overrides)
+                contractInstance.connect(addr1).publicMint(1, false, overrides)
             ).to.be.revertedWith("It's not possible to claim just yet");
         });
 
-        it("Should be reverted because the Has_Public is false", async function () {
+        it("Should be reverted because the Has_Public is false,", async function () {
             await contractInstance.connect(owner).toggleHasPublic();
             const overrides = {
                 value: ethers.utils.parseEther("1"),
             };
             await expect(
-                contractInstance.connect(addr1).publicMint(1, overrides)
+                contractInstance.connect(addr1).publicMint(1, false, overrides)
             ).to.be.revertedWith("No public sale assigned to this project");
         });
 
@@ -421,7 +434,7 @@ describe("DaoConfigurator", function () {
             };
 
             await expect(
-                contractInstance.connect(addr1).publicMint(11, overrides)
+                contractInstance.connect(addr1).publicMint(11, false, overrides)
             ).to.be.revertedWith("you can't claim that much at once");
         });
 
@@ -430,7 +443,7 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("0.01"),
             };
             await expect(
-                contractInstance.connect(addr1).publicMint(1, overrides)
+                contractInstance.connect(addr1).publicMint(1, false, overrides)
             ).to.be.revertedWith("Ether value sent is below the price");
         });
 
@@ -441,7 +454,7 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
             await expect(
-                contractInstance.connect(addr1).publicMint(1, overrides)
+                contractInstance.connect(addr1).publicMint(1, false, overrides)
             ).to.be.revertedWith("Not started yet");
         });
 
@@ -452,11 +465,11 @@ describe("DaoConfigurator", function () {
 
             //5 token each time * 2000 = 10 000
             for (let i = 0; i < 200; i++) {
-                await contractInstance.connect(addr1).publicMint(5, overrides);
+                await contractInstance.connect(addr1).publicMint(5, false, overrides);
             }
 
             await expect(
-                contractInstance.connect(addr1).publicMint(1, overrides)
+                contractInstance.connect(addr1).publicMint(1, false, overrides)
             ).to.be.revertedWith("Not enough left to mint");
         });
 
@@ -465,15 +478,37 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
 
-            await contractInstance.connect(addr1).publicMint(1, overrides);
+            await contractInstance.connect(addr1).publicMint(1, false, overrides);
             expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
         });
 
         it("Should be possible to free mint", async function () {
             await contractInstance.setPublicPrice(ethers.utils.parseEther("0"));
-            await contractInstance.connect(addr1).publicMint(1);
+            await contractInstance.connect(addr1).publicMint(1, false);
             expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
         });
+
+        it("Should mint token with erc20", async function () {
+
+            await contractInstance.connect(owner).setERC20ContractAddress(ContractInstanceERC20.address);
+
+            await ContractInstanceERC20.connect(owner).approve(contractInstance.address, 10);
+
+            await contractInstance.connect(owner).publicMint(1, true);
+            expect(await contractInstance.balanceOf(owner.address)).to.equal(1);
+        });
+
+        it("Should not mint token with erc20 because the caller do not have enough fund allowed ", async function () {
+
+            await contractInstance.connect(owner).setERC20ContractAddress(ContractInstanceERC20.address);
+
+            await ContractInstanceERC20.connect(owner).approve(contractInstance.address, 1);
+
+            await expect(
+                contractInstance.connect(owner).publicMint(1, true)
+            ).to.be.revertedWith("You dont have enough ERC20");
+        });
+
     });
 
     describe("withdraw", function () {
@@ -487,7 +522,7 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
 
-            await contractInstance.connect(addr1).publicMint(1, overrides);
+            await contractInstance.connect(addr1).publicMint(1, false, overrides);
             await contractInstance.connect(addr3).withdraw();
         });
 
@@ -496,7 +531,7 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
 
-            await contractInstance.connect(addr1).publicMint(1, overrides);
+            await contractInstance.connect(addr1).publicMint(1, false, overrides);
 
             const accountBalanceBeforeWithdraw = ethers.utils.formatEther(
                 await contractInstance.provider.getBalance(addr3.address)
