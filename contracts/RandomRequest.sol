@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.1;
+pragma solidity 0.8.7;
 
 contract RandomRequest {
     uint256 private _scopeIndex = 0; // cache for random TokenID generation in the anti-sniping algo

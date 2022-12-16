@@ -3,10 +3,10 @@ const { ethers } = require("hardhat");
 const { solidityPack, keccak256 } = require("ethers/lib/utils");
 const { MerkleTree } = require("merkletreejs");
 
-const addDays = (date, days) => {
-    var result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result.getTime();
+const addDays = (days) => {
+    var d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.getTime();
 };
 
 describe("DaoConfigurator", function () {
@@ -16,15 +16,18 @@ describe("DaoConfigurator", function () {
         addr1,
         addr2,
         addr3,
+        addr4,
         addrs,
-        merkleTree;
+        merkleTree0,
+        merkleTree1;
 
     beforeEach(async function () {
         DaoConfigurator = await ethers.getContractFactory(
             "DaoConfiguratorERC721"
         );
 
-        [owner, addr1, addr2, addr3, ...addrs] = await ethers.getSigners();
+        [owner, addr1, addr2, addr3, addr4, ...addrs] =
+            await ethers.getSigners();
 
         contractInstance = await DaoConfigurator.deploy(
             "NFT_NAME",
@@ -42,20 +45,36 @@ describe("DaoConfigurator", function () {
         const admins = [addr2.address, addr3.address];
         contractInstance.setAdmins(admins);
 
-        const whiteList = [addr1.address, addr2.address, addr3.address];
+        const whiteList0 = [addr1.address, addr2.address, addr4.address];
 
-        const leaves = whiteList.map((x) =>
+        const leaves = whiteList0.map((x) =>
             keccak256(solidityPack(["address"], [x]))
         );
 
-        merkleTree = new MerkleTree(leaves, keccak256, { sort: true });
+        merkleTree0 = new MerkleTree(leaves, keccak256, { sort: true });
 
-        contractInstance.setWhiteList(
-            1670429163,
+        contractInstance.addWhiteList(
+            800,
+            addDays(1),
             10,
             ethers.utils.parseEther("1"),
-            merkleTree.getHexRoot(),
-            true
+            merkleTree0.getHexRoot()
+        );
+
+        const whiteList1 = [addr3.address, addr4.address];
+
+        const leaves1 = whiteList1.map((x) =>
+            keccak256(solidityPack(["address"], [x]))
+        );
+
+        merkleTree1 = new MerkleTree(leaves1, keccak256, { sort: true });
+
+        contractInstance.addWhiteList(
+            800,
+            addDays(1),
+            10,
+            ethers.utils.parseEther("1"),
+            merkleTree1.getHexRoot()
         );
     });
 
@@ -124,21 +143,21 @@ describe("DaoConfigurator", function () {
     describe("check whitelisted user", function () {
         it("Should not be whitelisted", async function () {
             const claimingAddress = keccak256(owner.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
             const proof = await contractInstance
                 .connect(owner)
-                .isWhiteListed(owner.address, hexProof);
+                .isWhiteListed(owner.address, hexProof, 0);
 
             expect(proof).to.equal(false);
         });
 
         it("Should be whitelisted", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
 
             const proof = await contractInstance
                 .connect(addr1)
-                .isWhiteListed(addr1.address, hexProof);
+                .isWhiteListed(addr1.address, hexProof, 0);
 
             expect(proof).to.equal(true);
         });
@@ -147,21 +166,23 @@ describe("DaoConfigurator", function () {
     describe("whitelist mint", function () {
         it("Should be reverted because the HAS_WL is false", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.toggleHasWL();
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            await contractInstance.connect(owner).toggleHasWL();
+
             const overrides = {
                 value: ethers.utils.parseEther("1"),
             };
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, overrides)
+                    .whiteListMint(1, hexProof, 0, overrides)
             ).to.be.revertedWith("No whitelist assigned to this project");
         });
 
         it("Should be reverted because the OPEN_SALES is false", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
 
             await contractInstance.connect(owner).toggleMint();
 
@@ -171,14 +192,23 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, overrides)
+                    .whiteListMint(1, hexProof, 0, overrides)
             ).to.be.revertedWith("It's not possible to claim just yet");
         });
 
         it("Should be reverted because the minting event has not begun", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.setWLstartDate(addDays(new Date(), 2));
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+            await contractInstance
+                .connect(owner)
+                .updateWhiteList(
+                    addDays(2),
+                    addDays(1),
+                    10,
+                    ethers.utils.parseEther("1"),
+                    merkleTree0.getHexRoot(),
+                    0
+                );
 
             const overrides = {
                 value: ethers.utils.parseEther("1"),
@@ -186,15 +216,24 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, overrides)
+                    .whiteListMint(1, hexProof, 0, overrides)
             ).to.be.revertedWith("Not started yet");
         });
 
-        it("Should be reverted because the Public event has begun", async function () {
+        it("Should be reverted because the Whitelist event has ended", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.setWLstartDate(1670409526);
-            await contractInstance.setPublicStartDate(1670495926);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            await contractInstance
+                .connect(owner)
+                .updateWhiteList(
+                    800,
+                    801,
+                    10,
+                    ethers.utils.parseEther("1"),
+                    merkleTree0.getHexRoot(),
+                    0
+                );
 
             const overrides = {
                 value: ethers.utils.parseEther("1"),
@@ -202,16 +241,86 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, overrides)
-            ).to.be.revertedWith(
-                "Public mint is open, the whitelist mint is over"
+                    .whiteListMint(1, hexProof, 0, overrides)
+            ).to.be.revertedWith("Whitelist sales has ended");
+        });
+
+        it("Should be reverted when try to mint in wrong whitelist", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, 1, overrides)
+            ).to.be.revertedWith("Invalid Merkle Proof");
+        });
+
+        it("Should be minting from two whitelists at same time", async function () {
+            const claimingAddress0 = keccak256(addr1.address);
+            const hexProof0 = merkleTree0.getHexProof(claimingAddress0);
+
+            const claimingAddress1 = keccak256(addr3.address);
+            const hexProof1 = merkleTree1.getHexProof(claimingAddress1);
+
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+
+            await contractInstance
+                .connect(addr1)
+                .whiteListMint(1, hexProof0, 0, overrides);
+            expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
+
+            await contractInstance
+                .connect(addr3)
+                .whiteListMint(1, hexProof1, 1, overrides);
+            expect(await contractInstance.balanceOf(addr3.address)).to.equal(1);
+        });
+
+        it("Same user should be able to mint from two whitelists", async function () {
+            const claimingAddress0 = keccak256(addr4.address);
+            const hexProof0 = merkleTree0.getHexProof(claimingAddress0);
+            const hexProof1 = merkleTree1.getHexProof(claimingAddress0);
+
+            const overrides = {
+                value: ethers.utils.parseEther("10"),
+            };
+
+            await contractInstance
+                .connect(addr4)
+                .whiteListMint(10, hexProof0, 0, overrides);
+            expect(await contractInstance.balanceOf(addr4.address)).to.equal(
+                10
             );
+
+            await contractInstance
+                .connect(addr4)
+                .whiteListMint(10, hexProof1, 1, overrides);
+            expect(await contractInstance.balanceOf(addr4.address)).to.equal(
+                20
+            );
+
+            await expect(
+                contractInstance
+                    .connect(addr4)
+                    .whiteListMint(1, hexProof0, 0, overrides)
+            ).to.be.revertedWith("you can't claim that much");
+
+            await expect(
+                contractInstance
+                    .connect(addr4)
+                    .whiteListMint(1, hexProof1, 1, overrides)
+            ).to.be.revertedWith("you can't claim that much");
         });
 
         it("Should be reverted if exceeded max token purchase", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.setPublicStartDate(addDays(new Date(), 2));
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
 
             const overrides = {
                 value: ethers.utils.parseEther("11"),
@@ -220,14 +329,13 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(11, hexProof, overrides)
+                    .whiteListMint(11, hexProof, 0, overrides)
             ).to.be.revertedWith("you can't claim that much at once");
         });
 
         it("Should be reverted because the caller do not have enough fund", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.setPublicStartDate(addDays(new Date(), 2));
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
 
             const overrides = {
                 value: ethers.utils.parseEther("0.01"),
@@ -235,14 +343,13 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(1, hexProof, overrides)
+                    .whiteListMint(1, hexProof, 0, overrides)
             ).to.be.revertedWith("Ether value sent is below the price");
         });
 
         it("Should be reverted because the caller exceeds max token per address", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.setPublicStartDate(addDays(new Date(), 2));
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
 
             const overrides = {
                 value: ethers.utils.parseEther("5"),
@@ -251,38 +358,38 @@ describe("DaoConfigurator", function () {
             await expect(
                 contractInstance
                     .connect(addr1)
-                    .whiteListMint(11, hexProof, overrides)
+                    .whiteListMint(11, hexProof, 0, overrides)
             ).to.be.revertedWith("you can't claim that much");
         });
 
         it("Verify whitelisted user minting count", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.setPublicStartDate(addDays(new Date(), 2));
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
             const overrides = {
                 value: ethers.utils.parseEther("10"),
             };
 
             await contractInstance
                 .connect(addr1)
-                .whiteListMint(10, hexProof, overrides);
+                .whiteListMint(10, hexProof, 0, overrides);
 
             expect(
-                await contractInstance.whiteListMintedCount(addr1.address)
+                await contractInstance.whiteListMintedCount(addr1.address, 0)
             ).to.equal(10);
         });
 
         it("Should mint token", async function () {
             const claimingAddress = keccak256(addr1.address);
-            const hexProof = merkleTree.getHexProof(claimingAddress);
-            await contractInstance.setPublicStartDate(addDays(new Date(), 2));
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
             const overrides = {
                 value: ethers.utils.parseEther("1"),
             };
 
             await contractInstance
                 .connect(addr1)
-                .whiteListMint(1, hexProof, overrides);
+                .whiteListMint(1, hexProof, 0, overrides);
             expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
         });
     });
@@ -328,7 +435,7 @@ describe("DaoConfigurator", function () {
         });
 
         it("Should be reverted because the minting event has not begun", async function () {
-            await contractInstance.setPublicStartDate(addDays(new Date(), 2));
+            await contractInstance.setPublicStartDate(addDays(2));
 
             const overrides = {
                 value: ethers.utils.parseEther("1"),
