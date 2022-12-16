@@ -1,4 +1,4 @@
-# Dao ERC721 Configurator
+# Hybrid ERC721 Configurator
 
 This project demonstrates a basic ERC721 use case. It comes with a sample contract, tests for that contract, a script that deploys that contract, and code sample to interact with the contract using js and ethers library.
 
