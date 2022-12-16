@@ -4,9 +4,11 @@ This project demonstrates a basic ERC721 use case. It comes with a sample contra
 
 Smart contract features: 
 - Randomized mint
+- Pausable event
 - Royatlties with 1 reicever 
 - Automatic reveal 
 - Unlimited whitelists with prices, mint limit, start/end dates
+- Withdraw with admins adresses
 
 Installation:
 
