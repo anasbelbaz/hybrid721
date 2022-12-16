@@ -10,8 +10,7 @@ const addDays = (days) => {
 };
 
 describe("DaoConfigurator", function () {
-    let 
-        MyTokenTest,
+    let MyTokenTest,
         ContractInstanceERC20,
         DaoConfigurator,
         contractInstance,
@@ -25,9 +24,7 @@ describe("DaoConfigurator", function () {
         merkleTree1;
 
     beforeEach(async function () {
-        MyTokenTest = await ethers.getContractFactory(
-            "MyTokenTest"
-        );
+        MyTokenTest = await ethers.getContractFactory("MyTokenTest");
 
         ContractInstanceERC20 = await MyTokenTest.deploy();
 
@@ -358,7 +355,7 @@ describe("DaoConfigurator", function () {
                     .connect(addr1)
                     .whiteListMint(1, hexProof, 0, false, overrides)
             ).to.be.revertedWith("Ether value sent is below the price");
-        }); 
+        });
 
         it("Should be reverted because the caller exceeds max token per address", async function () {
             const claimingAddress = keccak256(addr1.address);
@@ -465,7 +462,9 @@ describe("DaoConfigurator", function () {
 
             //5 token each time * 2000 = 10 000
             for (let i = 0; i < 200; i++) {
-                await contractInstance.connect(addr1).publicMint(5, false, overrides);
+                await contractInstance
+                    .connect(addr1)
+                    .publicMint(5, false, overrides);
             }
 
             await expect(
@@ -478,7 +477,9 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
 
-            await contractInstance.connect(addr1).publicMint(1, false, overrides);
+            await contractInstance
+                .connect(addr1)
+                .publicMint(1, false, overrides);
             expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
         });
 
@@ -489,26 +490,33 @@ describe("DaoConfigurator", function () {
         });
 
         it("Should mint token with erc20", async function () {
+            await contractInstance
+                .connect(owner)
+                .setERC20ContractAddress(ContractInstanceERC20.address, 1);
 
-            await contractInstance.connect(owner).setERC20ContractAddress(ContractInstanceERC20.address);
-
-            await ContractInstanceERC20.connect(owner).approve(contractInstance.address, 10);
+            await ContractInstanceERC20.connect(owner).approve(
+                contractInstance.address,
+                10
+            );
 
             await contractInstance.connect(owner).publicMint(1, true);
             expect(await contractInstance.balanceOf(owner.address)).to.equal(1);
         });
 
         it("Should not mint token with erc20 because the caller do not have enough fund allowed ", async function () {
+            await contractInstance
+                .connect(owner)
+                .setERC20ContractAddress(ContractInstanceERC20.address, 2);
 
-            await contractInstance.connect(owner).setERC20ContractAddress(ContractInstanceERC20.address);
-
-            await ContractInstanceERC20.connect(owner).approve(contractInstance.address, 1);
+            await ContractInstanceERC20.connect(owner).approve(
+                contractInstance.address,
+                1
+            );
 
             await expect(
                 contractInstance.connect(owner).publicMint(1, true)
             ).to.be.revertedWith("You dont have enough ERC20");
         });
-
     });
 
     describe("withdraw", function () {
@@ -522,7 +530,9 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
 
-            await contractInstance.connect(addr1).publicMint(1, false, overrides);
+            await contractInstance
+                .connect(addr1)
+                .publicMint(1, false, overrides);
             await contractInstance.connect(addr3).withdraw();
         });
 
@@ -531,7 +541,9 @@ describe("DaoConfigurator", function () {
                 value: ethers.utils.parseEther("1"),
             };
 
-            await contractInstance.connect(addr1).publicMint(1, false, overrides);
+            await contractInstance
+                .connect(addr1)
+                .publicMint(1, false, overrides);
 
             const accountBalanceBeforeWithdraw = ethers.utils.formatEther(
                 await contractInstance.provider.getBalance(addr3.address)

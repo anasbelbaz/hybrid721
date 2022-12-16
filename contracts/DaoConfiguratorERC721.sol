@@ -432,8 +432,12 @@ contract DaoConfiguratorERC721 is
         HAS_PUBLIC = !HAS_PUBLIC;
     }
 
-    function setERC20ContractAddress(address _erc20) external onlyOwner {
+    function setERC20ContractAddress(address _erc20, uint256 _price)
+        external
+        onlyOwner
+    {
         erc20Token = IERC20(_erc20);
+        ERC20_PUBLIC_PRICE = _price;
     }
 
     function updateWhiteList(
