@@ -8,7 +8,7 @@ Smart contract features:
 - Royatlties with 1 reicever 
 - Automatic reveal 
 - Unlimited whitelists with prices, mint limit, start/end dates
-- Withdraw with admins adresses
+- Withdraw with admins addresses
 
 Installation:
 
