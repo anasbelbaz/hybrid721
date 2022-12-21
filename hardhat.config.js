@@ -31,6 +31,9 @@ task(
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
+    mocha: {
+        timeout: 100000000,
+    },
     etherscan: {
         apiKey: process.env.API_KEY,
     },

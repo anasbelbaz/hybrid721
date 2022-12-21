@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "./lib/ERC2981PerTokenRoyalties.sol";
 import "./RandomRequest.sol";
 
-contract ERC721_DutchAuction is
+contract dutchAuction is
     ERC721Enumerable,
     Ownable,
     ERC2981PerTokenRoyalties,
@@ -16,35 +16,35 @@ contract ERC721_DutchAuction is
 {
     using Strings for uint256;
 
+    address private ROYALTY_RECIPIENT;
+    string private REVEAL_URI = "";
+    uint256 private REVEAL_DATE;
+
     uint256 public constant MAX_PER_CLAIM = 10;
+
+    string public BASE_URI = "";
+    uint256 public minted = 0;
+    uint256 public mintIndexStart = 1;
+
     uint256 public MAX_MINTABLE; // max supply
     uint256 public MAX_PUBLIC_CLAIM; // max claim per address (if 0 = unlimited)
     uint256 public STARTING_NFT_PRICE; // dutch auction will start at this price
     uint256 public ROYALTY_VALUE; // 100 = 1%, 200 = 2% etc...
     uint256 public MIN_PRICE; // dutch auction can't go under this price (0 for freemint)
     uint256 public DURATION_STEP; // time between each step (in sec)
+
     uint256 public discountRate; // define the price drop at each step
     uint256 public startAt;
     uint256 public last_price;
-    bool public MintIsOpen = true;
+    bool public OPEN_SALES = true;
     bool public RANDOMIZED;
-
-    string public BASE_URI = "";
-    string private REVEAL_URI = "";
-    uint256 private REVEAL_DATE;
-    uint256 public minted = 0;
-    mapping(address => bool) admins;
-    address private ROYALTY_RECIPIENT;
-    uint256 public mintIndexStart = 1;
 
     event MINT(uint256 indexed _id, uint256 indexed _price);
 
     mapping(address => uint256) public publicMintedAmount;
+    mapping(address => bool) admins;
 
-    address public constant KALAO = 0xeff2357C9e40103Ac4d268B32de478E4fBBFc4f0;
-
-    //mainnet 0xeff2357C9e40103Ac4d268B32de478E4fBBFc4f0
-    //testnet 0xc7B0a494eaE1aFf383f5D27DCBC67559392e5671
+    address public KALAO_CONTRACT;
 
     constructor(
         string memory nftName,
@@ -53,13 +53,15 @@ contract ERC721_DutchAuction is
         uint256 _MAX_MINTABLE,
         address _ROYALTY_RECIPIENT,
         uint256 _ROYALTY_VALUE,
-        uint256 _MAX_PUBLIC_CLAIM
-    ) ERC721(nftName, nftSymbol) Ownable() RandomRequest(MAX_MINTABLE) {
+        uint256 _MAX_PUBLIC_CLAIM,
+        address _KALAO_ADDRESS
+    ) ERC721(nftName, nftSymbol) Ownable() RandomRequest(_MAX_MINTABLE) {
         BASE_URI = _baseTokenURI;
         ROYALTY_RECIPIENT = _ROYALTY_RECIPIENT;
         ROYALTY_VALUE = _ROYALTY_VALUE;
         MAX_MINTABLE = _MAX_MINTABLE;
         MAX_PUBLIC_CLAIM = _MAX_PUBLIC_CLAIM;
+        KALAO_CONTRACT = _KALAO_ADDRESS;
     }
 
     /////////////////////////////////////////////////////////
@@ -70,12 +72,13 @@ contract ERC721_DutchAuction is
     //
     //
     function claim(uint256 n) public payable {
-        require(MintIsOpen == true, "Mint is currently closed");
+        require(OPEN_SALES == true, "Mint is currently closed");
         require(block.timestamp >= startAt, "Not started yet");
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint.");
         require(n > 0, "Number need to be higher than 0");
         require(n <= MAX_PER_CLAIM, "Max per claim is 10");
-        uint256 NFT_PRICE = getPublicPrice();
+
+        uint256 NFT_PRICE = getCurrentPrice();
         require(
             msg.value >= (NFT_PRICE * n),
             "Ether value sent is below the price"
@@ -115,7 +118,7 @@ contract ERC721_DutchAuction is
             payable(_msgSender()).transfer(excess);
         }
 
-        setApprovalForAll(KALAO, true);
+        setApprovalForAll(KALAO_CONTRACT, true);
     }
 
     /////////////////////////////////////////////////////////
@@ -225,6 +228,10 @@ contract ERC721_DutchAuction is
     //
     //
 
+    function setBaseUri(string memory uri) external onlyOwner {
+        BASE_URI = uri;
+    }
+
     function setAdmins(address[] calldata _addr) external onlyOwner {
         for (uint256 i = 0; i < _addr.length; i++) {
             admins[_addr[i]] = true;
@@ -235,12 +242,8 @@ contract ERC721_DutchAuction is
         ROYALTY_RECIPIENT = _ROYALTY_RECIPIENT;
     }
 
-    function setBASE_URI(string memory uri) external onlyOwner {
-        BASE_URI = uri;
-    }
-
     function toggleMint() external onlyOwner {
-        MintIsOpen = !MintIsOpen;
+        OPEN_SALES = !OPEN_SALES;
     }
 
     //////
@@ -273,7 +276,7 @@ contract ERC721_DutchAuction is
     //
     //
 
-    function getPublicPrice() public view returns (uint256) {
+    function getCurrentPrice() public view returns (uint256) {
         uint256 timeElapsed = block.timestamp - startAt;
         uint256 countTenMinutes = timeElapsed / DURATION_STEP; // 600sec = 10minutes
         uint256 discountFinal = countTenMinutes * discountRate;
