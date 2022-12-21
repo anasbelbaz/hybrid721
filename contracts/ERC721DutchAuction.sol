@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "./lib/ERC2981PerTokenRoyalties.sol";
 import "./RandomRequest.sol";
 
-contract dutchAuction is
+contract ERC721DutchAuction is
     ERC721Enumerable,
     Ownable,
     ERC2981PerTokenRoyalties,

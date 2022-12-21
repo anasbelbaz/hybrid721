@@ -9,8 +9,8 @@ const addDays = (days) => {
     return d.getTime();
 };
 
-describe("DaoConfigurator", function () {
-    let DaoConfigurator,
+describe("ERC721Configurator", function () {
+    let ERC721Configurator,
         contractInstance,
         owner,
         addr1,
@@ -22,14 +22,14 @@ describe("DaoConfigurator", function () {
         merkleTree1;
 
     beforeEach(async function () {
-        DaoConfigurator = await ethers.getContractFactory(
-            "DaoConfiguratorERC721"
+        ERC721Configurator = await ethers.getContractFactory(
+            "ERC721Configurator"
         );
 
         [owner, addr1, addr2, addr3, addr4, ...addrs] =
             await ethers.getSigners();
 
-        contractInstance = await DaoConfigurator.deploy(
+        contractInstance = await ERC721Configurator.deploy(
             "NFT_NAME",
             "NFT_SYMBOL",
             "base ",

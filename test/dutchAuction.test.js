@@ -16,7 +16,7 @@ const addMinutes = (minutes) => {
 };
 
 describe("DutchAuction", function () {
-    let DutchAuction,
+    let ERC721DutchAuction,
         contractInstance,
         owner,
         addr1,
@@ -26,12 +26,14 @@ describe("DutchAuction", function () {
         addrs;
 
     beforeEach(async function () {
-        DutchAuction = await ethers.getContractFactory("dutchAuction");
+        ERC721DutchAuction = await ethers.getContractFactory(
+            "ERC721DutchAuction"
+        );
 
         [owner, addr1, addr2, addr3, addr4, ...addrs] =
             await ethers.getSigners();
 
-        contractInstance = await DutchAuction.deploy(
+        contractInstance = await ERC721DutchAuction.deploy(
             "NFT_NAME",
             "NFT_SYMBOL",
             "base ",
@@ -122,16 +124,16 @@ describe("DutchAuction", function () {
                 value: ethers.utils.parseEther("3"),
             };
 
-            // const ok = await contractInstance.getCurrentPrice();
-            // console.log(ok);
+            const price = await contractInstance.getCurrentPrice();
+            console.log(price);
 
             setTimeout(async () => {
-                const ok = await contractInstance.getCurrentPrice();
-                console.log("timedout", ok);
-                return await expect(
+                const price = await contractInstance.getCurrentPrice();
+                console.log("timedout", price);
+                await expect(
                     contractInstance.connect(addr1).claim(1, overrides)
                 ).to.be.revertedWith("Ether value sent is below the price");
-            }, 10000).then(() => done());
+            }, 2000).then(() => done());
         });
     });
 

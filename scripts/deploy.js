@@ -7,8 +7,8 @@ async function main() {
     console.log("Deploying contract with the account:", deployer.address);
     console.log("Account balance:", (await deployer.getBalance()).toString());
 
-    const DaoConfiguratorERC721 = await ethers.getContractFactory(
-        "DaoConfiguratorERC721"
+    const ERC721Configurator = await ethers.getContractFactory(
+        "ERC721Configurator"
     );
 
     const [
@@ -25,7 +25,7 @@ async function main() {
         _MAX_PUBLIC_CLAIM,
     ] = params.args;
 
-    const contractInstance = await DaoConfiguratorERC721.deploy(
+    const contractInstance = await ERC721Configurator.deploy(
         _name,
         _symbol,
         _baseTokenURI,
@@ -59,7 +59,7 @@ async function main() {
 
     await contractInstance.setAdmins(params.admins);
 
-    console.log("DaoConfiguratorERC721 deployed to:", contractInstance.address);
+    console.log("ERC721Configurator deployed to:", contractInstance.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

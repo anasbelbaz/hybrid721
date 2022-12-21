@@ -17,7 +17,7 @@ struct WhiteList {
     bytes32 MERKLE_ROOT;
 }
 
-contract DaoConfiguratorERC721 is
+contract ERC721Configurator is
     ERC721Enumerable,
     Ownable,
     ERC2981PerTokenRoyalties,
