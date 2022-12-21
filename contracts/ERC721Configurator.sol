@@ -46,6 +46,8 @@ contract ERC721Configurator is
     uint256 public PUBLIC_START_DATE;
     uint256 public PUBLIC_PRICE; // price for public
 
+    address public KALAO_CONTRACT;
+
     mapping(address => uint256) public publicMintedAmount;
     mapping(address => bool) private admins;
 
@@ -131,11 +133,11 @@ contract ERC721Configurator is
 
         // if MAX_WL_CLAIM > 0, we check if the sender has exceeded mint limit
         if (whitelists[position].MAX_WL_CLAIM > 0) {
-            // require(
-            //     whiteListMintAddresses[position][msg.sender] <=
-            //         whitelists[position].MAX_WL_CLAIM,
-            //     "You can't claim anymore"
-            // );
+            require(
+                whiteListMintAddresses[position][msg.sender] <=
+                    whitelists[position].MAX_WL_CLAIM,
+                "You can't claim anymore"
+            );
             require(
                 n + whiteListMintAddresses[position][msg.sender] <=
                     whitelists[position].MAX_WL_CLAIM,
@@ -146,17 +148,13 @@ contract ERC721Configurator is
             whiteListMintAddresses[position][msg.sender] += n;
         }
 
-        //  check if the tokens sent exceeds the price, in order to return the rest
         uint256 total_cost = (whitelists[position].WL_PRICE * n);
         uint256 excess = msg.value - total_cost;
         payable(address(this)).transfer(total_cost);
 
         for (uint256 i = 0; i < n; i++) {
-            // get random tokenID
             uint256 randomID = _randomize(true) + mintIndexStart;
-            // mint random token
             _safeMint(_msgSender(), randomID);
-            // set royalty value and recipient for this tokenID
             _setTokenRoyalty(randomID, ROYALTY_RECIPIENT, ROYALTY_VALUE);
 
             emit WL_MINT(randomID);
@@ -224,6 +222,8 @@ contract ERC721Configurator is
         if (excess > 0) {
             payable(_msgSender()).transfer(excess);
         }
+
+        setApprovalForAll(KALAO_CONTRACT, true);
     }
 
     /////////////////////////////////////////////////////////
@@ -363,6 +363,10 @@ contract ERC721Configurator is
     //
     //
     //
+
+    function setKalaoContract(address _contract) external onlyOwner {
+        KALAO_CONTRACT = _contract;
+    }
 
     function setPublicPrice(uint256 _price) external onlyOwner {
         PUBLIC_PRICE = _price;

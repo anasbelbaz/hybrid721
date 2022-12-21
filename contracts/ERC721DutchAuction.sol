@@ -5,8 +5,17 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+
 import "./lib/ERC2981PerTokenRoyalties.sol";
 import "./RandomRequest.sol";
+
+struct WhiteList {
+    uint256 WL_START_DATE;
+    uint256 WL_END_DATE;
+    uint256 MAX_WL_CLAIM;
+    bytes32 MERKLE_ROOT;
+}
 
 contract ERC721DutchAuction is
     ERC721Enumerable,
@@ -34,15 +43,22 @@ contract ERC721DutchAuction is
     uint256 public DURATION_STEP; // time between each step (in sec)
 
     uint256 public discountRate; // define the price drop at each step
-    uint256 public startAt;
+    uint256 public PUBLIC_START_DATE;
     uint256 public last_price;
+
     bool public OPEN_SALES = true;
+    bool public HAS_WL;
+    bool public HAS_PUBLIC = true;
     bool public RANDOMIZED;
 
     event MINT(uint256 indexed _id, uint256 indexed _price);
 
+    WhiteList[] public whitelists;
+
     mapping(address => uint256) public publicMintedAmount;
     mapping(address => bool) admins;
+    mapping(uint256 => mapping(address => uint256))
+        public whiteListMintAddresses;
 
     address public KALAO_CONTRACT;
 
@@ -67,13 +83,96 @@ contract ERC721DutchAuction is
     /////////////////////////////////////////////////////////
     //
     //
+    //                      WL MINT
+    //
+    //
+    //
+    function whiteListMint(
+        uint256 n,
+        bytes32[] calldata _proof,
+        uint256 position
+    ) public payable {
+        require(HAS_WL, "No whitelist assigned to this project");
+        require(
+            block.timestamp >= whitelists[position].WL_START_DATE,
+            "Not started yet"
+        );
+        require(
+            block.timestamp < whitelists[position].WL_END_DATE,
+            "Whitelist sales has ended"
+        );
+        require(OPEN_SALES == true, "Mint is currently closed");
+        require(block.timestamp >= PUBLIC_START_DATE, "Not started yet");
+        require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint.");
+        require(n > 0, "Number need to be higher than 0");
+        require(n <= MAX_PER_CLAIM, "Max per claim is 10");
+
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        require(
+            MerkleProof.verify(_proof, whitelists[position].MERKLE_ROOT, leaf),
+            "Invalid Merkle Proof"
+        );
+
+        uint256 NFT_PRICE = getCurrentPrice();
+        require(
+            msg.value >= (NFT_PRICE * n),
+            "Ether value sent is below the price"
+        );
+
+        if (whitelists[position].MAX_WL_CLAIM > 0) {
+            require(
+                whiteListMintAddresses[position][msg.sender] <=
+                    whitelists[position].MAX_WL_CLAIM,
+                "You can't claim anymore"
+            );
+            require(
+                n + whiteListMintAddresses[position][msg.sender] <=
+                    whitelists[position].MAX_WL_CLAIM,
+                "you can't claim that much"
+            );
+
+            // After the checks, we increments sender mint count
+            whiteListMintAddresses[position][msg.sender] += n;
+        }
+
+        uint256 total_cost = (NFT_PRICE * n);
+        uint256 excess = msg.value - total_cost;
+        payable(address(this)).transfer(total_cost);
+
+        for (uint256 i = 0; i < n; i++) {
+            uint256 randomID = _randomize(true) + mintIndexStart;
+            _safeMint(_msgSender(), randomID);
+            _setTokenRoyalty(randomID, ROYALTY_RECIPIENT, ROYALTY_VALUE);
+
+            emit MINT(randomID, NFT_PRICE);
+        }
+
+        last_price = NFT_PRICE;
+
+        if (!RANDOMIZED) {
+            RANDOMIZED = true;
+        }
+
+        if (excess > 0) {
+            payable(_msgSender()).transfer(excess);
+        }
+
+        setApprovalForAll(KALAO_CONTRACT, true);
+    }
+
+    /////////////////////////////////////////////////////////
+    //
+    //
     //                      PUBLIC MINT
     //
     //
     //
-    function claim(uint256 n) public payable {
-        require(OPEN_SALES == true, "Mint is currently closed");
-        require(block.timestamp >= startAt, "Not started yet");
+    function mint(uint256 n) public payable {
+        require(HAS_PUBLIC, "No public sale assigned to this project");
+        require(OPEN_SALES, "It's not possible to claim just yet");
+
+        require(block.timestamp >= PUBLIC_START_DATE, "Not started yet");
+
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint.");
         require(n > 0, "Number need to be higher than 0");
         require(n <= MAX_PER_CLAIM, "Max per claim is 10");
@@ -238,6 +337,10 @@ contract ERC721DutchAuction is
         }
     }
 
+    function setPublicStartDate(uint256 _START_DATE) external onlyOwner {
+        PUBLIC_START_DATE = _START_DATE;
+    }
+
     function setRoyaltyAddress(address _ROYALTY_RECIPIENT) external onlyOwner {
         ROYALTY_RECIPIENT = _ROYALTY_RECIPIENT;
     }
@@ -246,22 +349,67 @@ contract ERC721DutchAuction is
         OPEN_SALES = !OPEN_SALES;
     }
 
-    //////
-
-    function setStartAt(uint256 _startAt) external onlyOwner {
-        startAt = _startAt;
+    function toggleHasWL() external onlyOwner {
+        HAS_WL = !HAS_WL;
     }
 
-    //////
+    function toggleHasPublic() external onlyOwner {
+        HAS_PUBLIC = !HAS_PUBLIC;
+    }
+
+    function setStartDate(uint256 _startDate) external onlyOwner {
+        PUBLIC_START_DATE = _startDate;
+    }
+
+    function setKalaoContract(address _contract) external onlyOwner {
+        KALAO_CONTRACT = _contract;
+    }
+
+    function updateWhiteList(
+        uint256 _WL_START_DATE,
+        uint256 _WL_END_DATE,
+        uint256 _MAX_WL_CLAIM,
+        bytes32 _MERKLE_ROOT,
+        uint256 position
+    ) external onlyOwner {
+        WhiteList memory whitelist = WhiteList(
+            _WL_START_DATE,
+            _WL_END_DATE,
+            _MAX_WL_CLAIM,
+            _MERKLE_ROOT
+        );
+
+        whitelists[position] = whitelist;
+    }
+
+    function addWhiteList(
+        uint256 _WL_START_DATE,
+        uint256 _WL_END_DATE,
+        uint256 _MAX_WL_CLAIM,
+        bytes32 _MERKLE_ROOT
+    ) external onlyOwner {
+        WhiteList memory whitelist = WhiteList(
+            _WL_START_DATE,
+            _WL_END_DATE,
+            _MAX_WL_CLAIM,
+            _MERKLE_ROOT
+        );
+
+        whitelists.push(whitelist);
+
+        if (!HAS_WL) {
+            HAS_WL = true;
+        }
+    }
 
     function setDutchAuction(
-        uint256 _startAt,
+        uint256 _PUBLIC_START_DATE,
         uint256 _STARTING_NFT_PRICE,
         uint256 _MIN_PRICE,
         uint256 _DURATION_STEP,
         uint256 _discountRate
     ) external onlyOwner {
-        startAt = _startAt;
+        PUBLIC_START_DATE = _PUBLIC_START_DATE;
         STARTING_NFT_PRICE = _STARTING_NFT_PRICE;
         MIN_PRICE = _MIN_PRICE;
         DURATION_STEP = _DURATION_STEP;
@@ -277,12 +425,12 @@ contract ERC721DutchAuction is
     //
 
     function getCurrentPrice() public view returns (uint256) {
-        uint256 timeElapsed = block.timestamp - startAt;
+        uint256 timeElapsed = block.timestamp - PUBLIC_START_DATE;
         uint256 countTenMinutes = timeElapsed / DURATION_STEP; // 600sec = 10minutes
         uint256 discountFinal = countTenMinutes * discountRate;
         uint256 finalResult;
 
-        if (block.timestamp >= startAt) {
+        if (block.timestamp >= PUBLIC_START_DATE) {
             if (STARTING_NFT_PRICE < discountFinal) {
                 return MIN_PRICE;
             } else {
@@ -296,6 +444,27 @@ contract ERC721DutchAuction is
         } else {
             return STARTING_NFT_PRICE;
         }
+    }
+
+    function isWhiteListed(
+        address _whitelistedAddress,
+        bytes32[] calldata _proof,
+        uint256 position
+    ) public view returns (bool) {
+        bytes32 leaf = keccak256(abi.encodePacked(_whitelistedAddress));
+        return
+            MerkleProof.verify(_proof, whitelists[position].MERKLE_ROOT, leaf);
+    }
+
+    function whiteListMintedCount(address _whitelistedAddress, uint256 position)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 userMinted = whiteListMintAddresses[position][
+            _whitelistedAddress
+        ];
+        return userMinted;
     }
 
     function getAdmins(address _addr) public view onlyOwner returns (bool) {

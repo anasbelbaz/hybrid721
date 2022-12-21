@@ -1,5 +1,7 @@
 const { expect, assert } = require("chai");
 const { ethers } = require("hardhat");
+const { solidityPack, keccak256 } = require("ethers/lib/utils");
+const { MerkleTree } = require("merkletreejs");
 
 const addDays = (days) => {
     var d = new Date();
@@ -53,6 +55,36 @@ describe("DutchAuction", function () {
             ethers.utils.parseEther("1"),
             10,
             ethers.utils.parseEther("1")
+        );
+
+        const whiteList0 = [addr1.address, addr2.address, addr4.address];
+
+        const leaves = whiteList0.map((x) =>
+            keccak256(solidityPack(["address"], [x]))
+        );
+
+        merkleTree0 = new MerkleTree(leaves, keccak256, { sort: true });
+
+        contractInstance.addWhiteList(
+            800,
+            addDays(1),
+            10,
+            merkleTree0.getHexRoot()
+        );
+
+        const whiteList1 = [addr3.address, addr4.address];
+
+        const leaves1 = whiteList1.map((x) =>
+            keccak256(solidityPack(["address"], [x]))
+        );
+
+        merkleTree1 = new MerkleTree(leaves1, keccak256, { sort: true });
+
+        contractInstance.addWhiteList(
+            800,
+            addDays(1),
+            10,
+            merkleTree1.getHexRoot()
         );
     });
 
@@ -119,7 +151,7 @@ describe("DutchAuction", function () {
     });
 
     describe("dutch auction tests", function () {
-        it("Should be reverted because the price has changed", async function (done) {
+        it("Should be reverted because the price has changed", async function () {
             const overrides = {
                 value: ethers.utils.parseEther("3"),
             };
@@ -130,132 +162,349 @@ describe("DutchAuction", function () {
             setTimeout(async () => {
                 const price = await contractInstance.getCurrentPrice();
                 console.log("timedout", price);
-                await expect(
-                    contractInstance.connect(addr1).claim(1, overrides)
-                ).to.be.revertedWith("Ether value sent is below the price");
-            }, 2000).then(() => done());
+                await expect(contractInstance.connect(addr1).mint(1, overrides))
+                    .to.be.revertedWith("Ether value sent is below the price")
+                    .then(() => done());
+            }, 10000);
         });
     });
 
-    // describe("public mint", function () {
-    //     it("Should be reverted because the OPEN_SALES is false", async function () {
-    //         await contractInstance.connect(owner).toggleMint();
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("1"),
-    //         };
-    //         await expect(
-    //             contractInstance.connect(addr1).publicMint(1, overrides)
-    //         ).to.be.revertedWith("It's not possible to claim just yet");
-    //     });
+    describe("public mint", function () {
+        it("Should be reverted because the OPEN_SALES is false", async function () {
+            await contractInstance.connect(owner).toggleMint();
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance.connect(addr1).mint(1, overrides)
+            ).to.be.revertedWith("It's not possible to claim just yet");
+        });
 
-    //     it("Should be reverted because the Has_Public is false", async function () {
-    //         await contractInstance.connect(owner).toggleHasPublic();
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("1"),
-    //         };
-    //         await expect(
-    //             contractInstance.connect(addr1).publicMint(1, overrides)
-    //         ).to.be.revertedWith("No public sale assigned to this project");
-    //     });
+        it("Should be reverted because the Has_Public is false", async function () {
+            await contractInstance.connect(owner).toggleHasPublic();
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance.connect(addr1).mint(1, overrides)
+            ).to.be.revertedWith("No public sale assigned to this project");
+        });
 
-    //     it("Should be reverted if exceeded max token purchase", async function () {
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("11"),
-    //         };
+        it("Should be reverted if exceeded max token purchase", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("11"),
+            };
 
-    //         await expect(
-    //             contractInstance.connect(addr1).publicMint(11, overrides)
-    //         ).to.be.revertedWith("you can't claim that much at once");
-    //     });
+            await expect(
+                contractInstance.connect(addr1).mint(11, overrides)
+            ).to.be.revertedWith("Max per claim is 10");
+        });
 
-    //     it("Should be reverted because the caller do not have enough fund", async function () {
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("0.01"),
-    //         };
-    //         await expect(
-    //             contractInstance.connect(addr1).publicMint(1, overrides)
-    //         ).to.be.revertedWith("Ether value sent is below the price");
-    //     });
+        it("Should be reverted because the caller do not have enough fund", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("0.01"),
+            };
+            await expect(
+                contractInstance.connect(addr1).mint(1, overrides)
+            ).to.be.revertedWith("Ether value sent is below the price");
+        });
 
-    //     it("Should be reverted because the minting event has not begun", async function () {
-    //         await contractInstance.setPublicStartDate(addDays(2));
+        it("Should be reverted because the minting event has not begun", async function () {
+            await contractInstance.setPublicStartDate(addDays(2));
 
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("1"),
-    //         };
-    //         await expect(
-    //             contractInstance.connect(addr1).publicMint(1, overrides)
-    //         ).to.be.revertedWith("Not started yet");
-    //     });
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance.connect(addr1).mint(1, overrides)
+            ).to.be.revertedWith("Not started yet");
+        });
 
-    //     it("Should be reverted because the caller exceeds max token", async function () {
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("5"),
-    //         };
+        // it("Should be reverted because the caller exceeds max token", async function () {
+        //     const overrides = {
+        //         value: ethers.utils.parseEther("5"),
+        //     };
 
-    //         //5 token each time * 2000 = 10 000
-    //         for (let i = 0; i < 200; i++) {
-    //             await contractInstance.connect(addr1).publicMint(5, overrides);
-    //         }
+        //     //5 token each time * 200 = 1000
+        //     for (let i = 0; i < 200; i++) {
+        //         await contractInstance.connect(addr1).mint(5, overrides);
+        //     }
 
-    //         await expect(
-    //             contractInstance.connect(addr1).publicMint(1, overrides)
-    //         ).to.be.revertedWith("Not enough left to mint");
-    //     });
+        //     await expect(
+        //         contractInstance.connect(addr1).mint(1, overrides)
+        //     ).to.be.revertedWith("amount exceeds the public minting limit");
+        // });
 
-    //     it("Should mint token", async function () {
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("1"),
-    //         };
+        it("Should mint token", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
 
-    //         await contractInstance.connect(addr1).publicMint(1, overrides);
-    //         expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
-    //     });
+            await contractInstance.connect(addr1).mint(1, overrides);
+            expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
+        });
+    });
 
-    //     it("Should be possible to free mint", async function () {
-    //         await contractInstance.setPublicPrice(ethers.utils.parseEther("0"));
-    //         await contractInstance.connect(addr1).publicMint(1);
-    //         expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
-    //     });
-    // });
+    describe("whitelist mint", function () {
+        it("Should be reverted because the HAS_WL is false", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
 
-    // describe("withdraw", function () {
-    //     it("Should be reverted because the caller is not admin", async function () {
-    //         await expect(
-    //             contractInstance.connect(addr1).withdraw()
-    //         ).to.be.revertedWith("Your are not admin");
-    //     });
-    //     it("Should withdraw fund by the admin", async function () {
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("1"),
-    //         };
+            await contractInstance.connect(owner).toggleHasWL();
 
-    //         await contractInstance.connect(addr1).publicMint(1, overrides);
-    //         await contractInstance.connect(addr3).withdraw();
-    //     });
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, 0, overrides)
+            ).to.be.revertedWith("No whitelist assigned to this project");
+        });
 
-    //     it("Should withdraw fund by the admin", async function () {
-    //         const overrides = {
-    //             value: ethers.utils.parseEther("1"),
-    //         };
+        it("Should be reverted because the OPEN_SALES is false", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
 
-    //         await contractInstance.connect(addr1).publicMint(1, overrides);
+            await contractInstance.connect(owner).toggleMint();
 
-    //         const accountBalanceBeforeWithdraw = ethers.utils.formatEther(
-    //             await contractInstance.provider.getBalance(addr3.address)
-    //         );
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, 0, overrides)
+            ).to.be.revertedWith("Mint is currently closed");
+        });
 
-    //         await contractInstance.connect(addr3).withdraw();
-    //         const accountBalanceAfterWithdraw = ethers.utils.formatEther(
-    //             await contractInstance.provider.getBalance(addr3.address)
-    //         );
+        it("Should be reverted because the minting event has not begun", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+            await contractInstance
+                .connect(owner)
+                .updateWhiteList(
+                    addDays(2),
+                    addDays(1),
+                    10,
+                    merkleTree0.getHexRoot(),
+                    0
+                );
 
-    //         expect(
-    //             parseInt(accountBalanceAfterWithdraw) >
-    //                 parseInt(accountBalanceBeforeWithdraw)
-    //         ).to.be.true;
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, 0, overrides)
+            ).to.be.revertedWith("Not started yet");
+        });
 
-    //         //get smart contract balance before withdraw and smart contract balance after withdraw
-    //     });
-    // });
+        it("Should be reverted because the Whitelist event has ended", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            await contractInstance
+                .connect(owner)
+                .updateWhiteList(800, 801, 10, merkleTree0.getHexRoot(), 0);
+
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, 0, overrides)
+            ).to.be.revertedWith("Whitelist sales has ended");
+        });
+
+        it("Should be reverted when try to mint in wrong whitelist", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, 1, overrides)
+            ).to.be.revertedWith("Invalid Merkle Proof");
+        });
+
+        it("Should be minting from two whitelists at same time", async function () {
+            const claimingAddress0 = keccak256(addr1.address);
+            const hexProof0 = merkleTree0.getHexProof(claimingAddress0);
+
+            const claimingAddress1 = keccak256(addr3.address);
+            const hexProof1 = merkleTree1.getHexProof(claimingAddress1);
+
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+
+            await contractInstance
+                .connect(addr1)
+                .whiteListMint(1, hexProof0, 0, overrides);
+            expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
+
+            await contractInstance
+                .connect(addr3)
+                .whiteListMint(1, hexProof1, 1, overrides);
+            expect(await contractInstance.balanceOf(addr3.address)).to.equal(1);
+        });
+
+        it("Same user should be able to mint from two whitelists", async function () {
+            const claimingAddress0 = keccak256(addr4.address);
+            const hexProof0 = merkleTree0.getHexProof(claimingAddress0);
+            const hexProof1 = merkleTree1.getHexProof(claimingAddress0);
+
+            const overrides = {
+                value: ethers.utils.parseEther("10"),
+            };
+
+            await contractInstance
+                .connect(addr4)
+                .whiteListMint(10, hexProof0, 0, overrides);
+            expect(await contractInstance.balanceOf(addr4.address)).to.equal(
+                10
+            );
+
+            await contractInstance
+                .connect(addr4)
+                .whiteListMint(10, hexProof1, 1, overrides);
+            expect(await contractInstance.balanceOf(addr4.address)).to.equal(
+                20
+            );
+
+            await expect(
+                contractInstance
+                    .connect(addr4)
+                    .whiteListMint(1, hexProof0, 0, overrides)
+            ).to.be.revertedWith("you can't claim that much");
+
+            await expect(
+                contractInstance
+                    .connect(addr4)
+                    .whiteListMint(1, hexProof1, 1, overrides)
+            ).to.be.revertedWith("you can't claim that much");
+        });
+
+        it("Should be reverted if exceeded max token purchase", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            const overrides = {
+                value: ethers.utils.parseEther("11"),
+            };
+
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(11, hexProof, 0, overrides)
+            ).to.be.revertedWith("Max per claim is 10");
+        });
+
+        it("Should be reverted because the caller do not have enough fund", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            const overrides = {
+                value: ethers.utils.parseEther("0.01"),
+            };
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(1, hexProof, 0, overrides)
+            ).to.be.revertedWith("Ether value sent is below the price");
+        });
+
+        it("Should be reverted because the caller exceeds max token per address", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            const overrides = {
+                value: ethers.utils.parseEther("5"),
+            };
+
+            await expect(
+                contractInstance
+                    .connect(addr1)
+                    .whiteListMint(11, hexProof, 0, overrides)
+            ).to.be.revertedWith("Max per claim is 10");
+        });
+
+        it("Verify whitelisted user minting count", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            const overrides = {
+                value: ethers.utils.parseEther("10"),
+            };
+
+            await contractInstance
+                .connect(addr1)
+                .whiteListMint(10, hexProof, 0, overrides);
+
+            expect(
+                await contractInstance.whiteListMintedCount(addr1.address, 0)
+            ).to.equal(10);
+        });
+
+        it("Should mint token", async function () {
+            const claimingAddress = keccak256(addr1.address);
+            const hexProof = merkleTree0.getHexProof(claimingAddress);
+
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+
+            await contractInstance
+                .connect(addr1)
+                .whiteListMint(1, hexProof, 0, overrides);
+            expect(await contractInstance.balanceOf(addr1.address)).to.equal(1);
+        });
+    });
+
+    describe("withdraw", function () {
+        it("Should be reverted because the caller is not admin", async function () {
+            await expect(
+                contractInstance.connect(addr1).withdraw()
+            ).to.be.revertedWith("Your are not the owner");
+        });
+        it("Should withdraw fund by the admin", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+
+            await contractInstance.connect(addr1).mint(1, overrides);
+            await contractInstance.connect(addr3).withdraw();
+        });
+
+        it("Should withdraw fund by the admin", async function () {
+            const overrides = {
+                value: ethers.utils.parseEther("1"),
+            };
+
+            await contractInstance.connect(addr1).mint(1, overrides);
+
+            const accountBalanceBeforeWithdraw = ethers.utils.formatEther(
+                await contractInstance.provider.getBalance(addr3.address)
+            );
+
+            await contractInstance.connect(addr3).withdraw();
+            const accountBalanceAfterWithdraw = ethers.utils.formatEther(
+                await contractInstance.provider.getBalance(addr3.address)
+            );
+
+            expect(
+                parseInt(accountBalanceAfterWithdraw) >
+                    parseInt(accountBalanceBeforeWithdraw)
+            ).to.be.true;
+
+            //get smart contract balance before withdraw and smart contract balance after withdraw
+        });
+    });
 });
