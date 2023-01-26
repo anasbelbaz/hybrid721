@@ -2,6 +2,14 @@
 
 This project demonstrates a basic ERC721 use case. It comes with a sample contract, tests for that contract, a script that deploys that contract, and code sample to interact with the contract using js.
 
+Smart contract features: 
+- Randomized mint
+- Pausable event
+- Royatlties with 1 reicever 
+- Automatic reveal 
+- Whitelist with prices, mint limit, start/end dates
+- Withdraw with admins addresses
+
 Installation:
 
 ```shell
