@@ -32,11 +32,11 @@ contract DaoConfiguratorERC721 is
     address private ROYALTY_RECIPIENT;
     uint256 public ROYALTY_VALUE; // 100 = 1%, 200 = 2% etc...
 
-    uint256 public MAX_PUBLIC_CLAIM; // max mint per address for the public / if 0, their is no limit
+    uint256 public MAX_PUBLIC_CLAIM; // max mint per address for the public / if 0, there is no limit
     uint256 public PUBLIC_START_DATE;
     uint256 public PUBLIC_PRICE; // price for public
 
-    uint256 public MAX_WL_CLAIM; // max mint per address for the WL / if 0, their is no limit
+    uint256 public MAX_WL_CLAIM; // max mint per address for the WL / if 0, there is no limit
     uint256 public WL_START_DATE;
     uint256 public WL_PRICE; // price for WL
 
@@ -151,7 +151,7 @@ contract DaoConfiguratorERC721 is
             emit WL_MINT(randomID);
         }
 
-        // mark that the tokens has been randomized in order to call adminMintRandom
+        // set that the tokens has been randomized in order to avoid calling regular adminMint
         if (!RANDOMIZED) {
             RANDOMIZED = true;
         }
@@ -205,7 +205,7 @@ contract DaoConfiguratorERC721 is
             emit MINT(randomID);
         }
 
-        // mark that the tokens has been randomized in order to call adminMintRandom
+        // set that the tokens has been randomized in order to avoid calling regular adminMint
         if (!RANDOMIZED) {
             RANDOMIZED = true;
         }
@@ -293,7 +293,7 @@ contract DaoConfiguratorERC721 is
             emit MINT(randomID);
         }
 
-        // mark that the tokens has been randomized in order to call adminMintRandom
+        // set that the tokens has been randomized in order to avoid calling regular adminMint
         if (!RANDOMIZED) {
             RANDOMIZED = true;
         }
