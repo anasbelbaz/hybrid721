@@ -69,6 +69,7 @@ contract ERC721DutchAuction is
         uint256 _MAX_MINTABLE,
         address _ROYALTY_RECIPIENT,
         uint256 _ROYALTY_VALUE,
+        uint256 _PUBLIC_START_DATE,
         uint256 _MAX_PUBLIC_CLAIM,
         address _KALAO_ADDRESS
     ) ERC721(nftName, nftSymbol) Ownable() RandomRequest(_MAX_MINTABLE) {
@@ -78,6 +79,7 @@ contract ERC721DutchAuction is
         MAX_MINTABLE = _MAX_MINTABLE;
         MAX_PUBLIC_CLAIM = _MAX_PUBLIC_CLAIM;
         KALAO_CONTRACT = _KALAO_ADDRESS;
+        PUBLIC_START_DATE = _PUBLIC_START_DATE;
     }
 
     /////////////////////////////////////////////////////////
