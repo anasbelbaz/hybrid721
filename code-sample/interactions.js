@@ -96,6 +96,7 @@ export const publicMintERC721 = async (provider, params) => {
 
 export const whiteListMintERC721 = async (provider, params) => {
     try {
+        //whitelist
         const whiteList = ["0x", "0x", "0x"];
 
         // re-creating the tree
@@ -129,7 +130,7 @@ export const whiteListMintERC721 = async (provider, params) => {
     }
 };
 
-export const setOpenSales = async (provider, collectionAddress) => {
+export const toggleMint = async (provider, collectionAddress) => {
     try {
         const signer = provider.getSigner();
 
