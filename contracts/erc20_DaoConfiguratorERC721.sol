@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./lib/ERC2981PerTokenRoyalties.sol";
 import "./RandomRequest.sol";
 
@@ -48,10 +49,13 @@ contract DaoConfiguratorERC721 is
     event WL_MINT(uint256 indexed _id);
     event MINT(uint256 indexed _id);
 
+    IERC20 public erc20Token;
+
     constructor(
         string memory _name,
         string memory _symbol,
         string memory _baseTokenURI,
+        address _erc20,
         uint256 _MAX_MINTABLE,
         address _ROYALTY_RECIPIENT,
         uint256 _ROYALTY_VALUE,
@@ -60,8 +64,9 @@ contract DaoConfiguratorERC721 is
         uint256 _REVEAL_DATE,
         uint256 _MAX_PUBLIC_CLAIM
     ) ERC721(_name, _symbol) Ownable() RandomRequest(_MAX_MINTABLE) {
-        MAX_MINTABLE = _MAX_MINTABLE;
+        erc20Token = IERC20(_erc20);
         BASE_URI = _baseTokenURI;
+        MAX_MINTABLE = _MAX_MINTABLE;
         REVEAL_DATE = _REVEAL_DATE;
         ROYALTY_RECIPIENT = _ROYALTY_RECIPIENT;
         ROYALTY_VALUE = _ROYALTY_VALUE;
@@ -117,6 +122,12 @@ contract DaoConfiguratorERC721 is
             "Ether value sent is below the price"
         );
 
+        require(
+            GetAllowance() >= (n * WL_PRICE),
+            "You dont have enough Tokens"
+        );
+        erc20Token.transferFrom(msg.sender, address(this), (n * WL_PRICE));
+
         // if MAX_WL_CLAIM > 0, we check if the sender has exceeded mint limit
         if (MAX_WL_CLAIM > 0) {
             require(
@@ -132,11 +143,6 @@ contract DaoConfiguratorERC721 is
             whiteListMintAddresses[msg.sender] += n;
         }
 
-        //  check if the tokens sent exceeds the price, in order to return the rest
-        uint256 total_cost = (WL_PRICE * n);
-        uint256 excess = msg.value - total_cost;
-        payable(address(this)).transfer(total_cost);
-
         for (uint256 i = 0; i < n; i++) {
             // get random tokenID
             uint256 randomID = _randomize(true) + mintIndexStart;
@@ -151,11 +157,6 @@ contract DaoConfiguratorERC721 is
         // set that the tokens has been randomized in order to avoid calling regular adminMint
         if (!RANDOMIZED) {
             RANDOMIZED = true;
-        }
-
-        if (excess > 0) {
-            // return the rest of tokens to sender
-            payable(_msgSender()).transfer(excess);
         }
     }
 
@@ -173,10 +174,13 @@ contract DaoConfiguratorERC721 is
         require(n > 0, "Number need to be higher than 0");
         require(n + totalSupply() <= MAX_MINTABLE, "Not enough left to mint");
         require(n <= MAX_PER_CLAIM, "you can't claim that much at once");
+
         require(
-            msg.value >= (PUBLIC_PRICE * n),
-            "Ether value sent is below the price"
+            GetAllowance() >= (n * PUBLIC_PRICE),
+            "You dont have enough Tokens"
         );
+        erc20Token.transferFrom(msg.sender, address(this), (n * PUBLIC_PRICE));
+
         if (MAX_PUBLIC_CLAIM > 0) {
             require(
                 publicMintedAmount[msg.sender] < MAX_PUBLIC_CLAIM,
@@ -189,11 +193,6 @@ contract DaoConfiguratorERC721 is
             publicMintedAmount[msg.sender] += n;
         }
 
-        uint256 total_cost = (PUBLIC_PRICE * n);
-
-        uint256 excess = msg.value - total_cost;
-        payable(address(this)).transfer(total_cost);
-
         for (uint256 i = 0; i < n; i++) {
             uint256 randomID = _randomize(true) + mintIndexStart;
             _safeMint(_msgSender(), randomID);
@@ -205,10 +204,6 @@ contract DaoConfiguratorERC721 is
         // set that the tokens has been randomized in order to avoid calling regular adminMint
         if (!RANDOMIZED) {
             RANDOMIZED = true;
-        }
-
-        if (excess > 0) {
-            payable(_msgSender()).transfer(excess);
         }
     }
 
@@ -419,6 +414,10 @@ contract DaoConfiguratorERC721 is
         HAS_WL = _HAS_WL;
     }
 
+    function setERC20Contract(address _erc20) external onlyOwner {
+        erc20Token = IERC20(_erc20);
+    }
+
     /////////////////////////////////////////////////////////
     //
     //
@@ -444,6 +443,14 @@ contract DaoConfiguratorERC721 is
         return userMinted;
     }
 
+    function GetAllowance() public view returns (uint256) {
+        return erc20Token.allowance(msg.sender, address(this));
+    }
+
+    function getContractTokenBalance() public view returns (uint256) {
+        return erc20Token.balanceOf(address(this));
+    }
+
     /////////////////////////////////////////////////////////
     //
     //
@@ -454,8 +461,8 @@ contract DaoConfiguratorERC721 is
 
     function withdraw() external {
         require(admins[_msgSender()] == true, "Your are not admin");
-        require(address(this).balance > 0, "Nothing to withdraw");
-        payable(_msgSender()).transfer(address(this).balance);
+        require(getContractTokenBalance() > 0, "Nothing to withdraw");
+        erc20Token.transfer(_msgSender(), getContractTokenBalance());
     }
 
     receive() external payable {}
